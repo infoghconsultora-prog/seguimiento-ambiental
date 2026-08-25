@@ -1,6 +1,6 @@
-# gh-vencimientos
+# Seguimiento Ambiental
 
-Panel de vencimientos de habilitaciones y auditorías ambientales de GH Consultora,
+Panel de seguimiento ambiental de GH Consultora: habilitaciones, vencimientos y auditorías,
 publicado con GitHub Pages.
 
 ## Cómo está armado
