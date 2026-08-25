@@ -96,7 +96,8 @@
       radial-gradient(circle at 76% 12%, color-mix(in srgb,var(--accent) 30%,transparent), transparent 58%); }
   header, main, footer{ position:relative; z-index:1; }
   .brand{ display:flex; align-items:center; gap:12px; }
-  .logo{ font-weight:700; font-size:22px; letter-spacing:-.4px;
+  .logo{ font-weight:700; font-size:22px; letter-spacing:-.4px; line-height:1.35;
+    padding:2px 1px; display:inline-block;
     background:linear-gradient(135deg,var(--accent),var(--brand));
     -webkit-background-clip:text; background-clip:text; color:transparent; }
   .brand-text h1{ font-size:20px; line-height:25px; margin:0; font-weight:600; letter-spacing:-.3px; }
@@ -386,7 +387,7 @@
   #loginScreen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
   .login-card{ background:var(--surface); border-radius:var(--r-xl); padding:40px 36px;
     max-width:420px; width:100%; text-align:center; box-shadow:var(--shadow-elevated); }
-  .login-logo{ font-size:40px; margin-bottom:12px; }
+  .login-logo{ font-size:44px; line-height:1.3; padding:4px 2px; margin-bottom:10px; }
   #loginScreen h1{ font-size:22px; line-height:28px; font-weight:600; margin:0 0 8px; letter-spacing:-.35px; }
   #loginScreen p{ font-size:15px; line-height:20px; color:var(--label-2); margin:0 0 24px; }
   #gsiButton{ display:flex; justify-content:center; }
@@ -495,6 +496,23 @@ const CLIENT_ID  = '397447072902-nhbl4at1hhd41igam0hbq7p2kc0gt8up.apps.googleuse
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k2o2gI_oDSOlDrkQs7PbMDNRvDEUR6ajoAhABSNVuCmHi9PpDNw/exec';
 
 let idToken = null;
+
+// Manda un archivo al backend en base64. El destino lo resuelve el backend
+// a partir del link de la resolucion (la carpeta del expediente).
+function subirAlBackend(file, extra){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>{
+      llamarBackend('subirArchivo', Object.assign({
+        nombre: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        base64: r.result.split(',')[1]
+      }, extra)).then(resolve).catch(reject);
+    };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
 
 function llamarBackend(action, extra){
   return fetch(BACKEND_URL, {
@@ -1090,13 +1108,25 @@ function render(empresas){
       input.addEventListener('change', ()=>{
         if(!input.files.length) return;
         const tile = fila.closest('.tile');
+        const idx = [...card.querySelectorAll('.tile')].indexOf(tile);
+        const it = emp.items[idx];
         let ok = tile.querySelector('.hab-nueva');
         if(!ok){
           ok = document.createElement('div');
           ok.className = 'hab-nueva';
           fila.insertAdjacentElement('afterend', ok);
         }
-        ok.innerHTML = ico('check') + ' Nueva habilitación: ' + escapeHtml(input.files[0].name) + ' — falta cargar fechas';
+        ok.innerHTML = 'Subiendo ' + escapeHtml(input.files[0].name) + '…';
+        subirAlBackend(input.files[0], {
+          empresa: emp.empresa,
+          expediente: it.expediente,
+          resolucionUrl: it.resolucion_url
+        }).then(r=>{
+          ok.innerHTML = r.ok
+            ? ico('check') + ' Guardado en ' + escapeHtml(r.carpeta) +
+              ' — <a class="doc-link" href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">ver</a>'
+            : 'No se pudo subir: ' + escapeHtml(r.detalle || r.error);
+        }).catch(()=>{ ok.textContent = 'No se pudo subir. Probá de nuevo.'; });
       });
     });
 
@@ -1137,6 +1167,9 @@ function render(empresas){
       input.addEventListener('change', ()=>{
         if(!input.files.length) return;
         const nombre = input.files[0].name;
+        subirAlBackend(input.files[0], { empresa: emp.empresa, expediente: null, resolucionUrl: emp.ficha_url })
+          .then(()=> llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: nombre }))
+          .catch(()=>{});
         strip.className = 'auditoria verde';
         strip.querySelector('.fecha').textContent = fmtFecha(HOY.toISOString().slice(0,10));
         const dias = strip.querySelector('.dias');
