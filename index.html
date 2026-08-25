@@ -1,0 +1,1155 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Vencimientos GH Consultora</title>
+<style>
+  /* Paleta GH Consultora (la misma de calibraciones y seguimiento de mediciones),
+     montada sobre la escala tipografica, el espaciado y los materiales de Apple. */
+  :root{
+    --font-system:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --accent:#4a7a1e; --accent-ink:#4a7a1e; --brand:#8dc63f;
+
+    --label:#2b2f26; --label-2:#5b6058; --label-3:#8d9287;
+    --bg:#f7f8f4; --surface:#ffffff; --surface-2:#fbfbf8;
+    --gray:#6b7280; --gray-5:#e7eae2; --gray-6:#f1f3ee;
+    --separator:#dfe3da;
+
+    --verde:#4c9a2a;   --verde-bg:#eaf4e2;
+    --amarillo:#b8860b; --amarillo-bg:#fbf1d6;
+    --naranja:#c56a15; --naranja-bg:#fbe6d2;
+    --rojo:#b3261e;    --rojo-bg:#f9e0de;
+    --negro:#23261c;   --negro-bg:#d8dad4;
+    --gris:#6b7280;    --gris-bg:#eceff1;
+    --azul:#35618f;    --azul-bg:#e3ecf5;
+    --on-verde:#fff; --on-amarillo:#fff; --on-naranja:#fff;
+    --on-rojo:#fff; --on-negro:#fff; --on-gris:#fff; --on-azul:#fff;
+
+    --r-sm:10px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-pill:999px;
+    --shadow-card:0 1px 2px rgba(43,47,38,.06), 0 8px 24px rgba(43,47,38,.08);
+    --shadow-elevated:0 2px 4px rgba(43,47,38,.10), 0 16px 40px rgba(43,47,38,.14);
+    --glass-bg:rgba(255,255,255,.48); --glass-bg-clear:rgba(255,255,255,.30);
+    --glass-blur:blur(24px) saturate(180%) brightness(1.03);
+    --glass-highlight:rgba(255,255,255,.55); --glass-bevel:rgba(43,47,38,.05);
+    --ease:cubic-bezier(0.32,0.72,0,1);
+    --ease-snappy:cubic-bezier(0.36,0.66,0.04,1);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --accent:#8dc63f; --accent-ink:#8dc63f;
+    --label:#eef0e8; --label-2:#a7ad9d; --label-3:#7d8377;
+    --bg:#14170f; --surface:#1c211a; --surface-2:#20261c;
+    --gray-5:#2a3025; --gray-6:#222820; --separator:#2a2f24;
+    --verde:#6ab83f; --amarillo:#c99a1e; --naranja:#d67c26; --rojo:#c9372e;
+    --negro:#3b4034; --gris:#8b9086; --azul:#4b7cae;
+    --verde-bg:#1d2b16; --amarillo-bg:#2b230f; --naranja-bg:#2b1f10;
+    --rojo-bg:#2b1513; --negro-bg:#2c2f28; --gris-bg:#22261f; --azul-bg:#16202b;
+    --shadow-card:0 1px 2px rgba(0,0,0,.32), 0 8px 24px rgba(0,0,0,.38);
+    --shadow-elevated:0 2px 4px rgba(0,0,0,.38), 0 16px 40px rgba(0,0,0,.48);
+    --glass-bg:rgba(28,33,26,.42); --glass-bg-clear:rgba(28,33,26,.26);
+    --glass-highlight:rgba(255,255,255,.12); --glass-bevel:rgba(0,0,0,.22);
+  }}
+  :root[data-theme="dark"]{
+    --accent:#8dc63f; --accent-ink:#8dc63f;
+    --label:#eef0e8; --label-2:#a7ad9d; --label-3:#7d8377;
+    --bg:#14170f; --surface:#1c211a; --surface-2:#20261c;
+    --gray-5:#2a3025; --gray-6:#222820; --separator:#2a2f24;
+    --verde:#6ab83f; --amarillo:#c99a1e; --naranja:#d67c26; --rojo:#c9372e;
+    --negro:#3b4034; --gris:#8b9086; --azul:#4b7cae;
+    --verde-bg:#1d2b16; --amarillo-bg:#2b230f; --naranja-bg:#2b1f10;
+    --rojo-bg:#2b1513; --negro-bg:#2c2f28; --gris-bg:#22261f; --azul-bg:#16202b;
+    --shadow-card:0 1px 2px rgba(0,0,0,.32), 0 8px 24px rgba(0,0,0,.38);
+    --shadow-elevated:0 2px 4px rgba(0,0,0,.38), 0 16px 40px rgba(0,0,0,.48);
+    --glass-bg:rgba(28,33,26,.42); --glass-bg-clear:rgba(28,33,26,.26);
+    --glass-highlight:rgba(255,255,255,.12); --glass-bevel:rgba(0,0,0,.22);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--bg); color:var(--label); font-family:var(--font-system);
+    -webkit-font-smoothing:antialiased; font-size:17px; line-height:22px; }
+  a{color:inherit;}
+  button{font-family:inherit;}
+  .icon{width:1em;height:1em;flex:0 0 auto;display:inline-block;vertical-align:-.12em;}
+
+  /* ---------- barra superior: capa de control con Liquid Glass ---------- */
+  header{
+    position:sticky; top:0; z-index:40; isolation:isolate;
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    padding:14px clamp(16px,2vw,32px);
+    display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
+    box-shadow:
+      inset 0 1px 1px var(--glass-highlight),
+      inset 0 -1px 1px var(--glass-bevel),
+      0 8px 30px rgba(43,47,38,.10);
+  }
+  /* brillo especular: la luz pegando desde arriba a la izquierda */
+  header::before{ content:""; position:absolute; inset:0; pointer-events:none; z-index:-1;
+    background:linear-gradient(120deg,
+      rgba(255,255,255,.28) 0%, rgba(255,255,255,.07) 30%, rgba(255,255,255,0) 55%); }
+  /* algo que refractar: el fondo plano no da vidrio, asi que va un halo de marca detras */
+  body::before{ content:""; position:fixed; top:-160px; left:-80px; right:-80px; height:420px;
+    z-index:0; pointer-events:none; filter:blur(60px); opacity:.55;
+    background:
+      radial-gradient(circle at 18% 30%, color-mix(in srgb,var(--brand) 38%,transparent), transparent 62%),
+      radial-gradient(circle at 76% 12%, color-mix(in srgb,var(--accent) 30%,transparent), transparent 58%); }
+  header, main, footer{ position:relative; z-index:1; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .logo{ font-weight:700; font-size:22px; letter-spacing:-.4px;
+    background:linear-gradient(135deg,var(--accent),var(--brand));
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .brand-text h1{ font-size:20px; line-height:25px; margin:0; font-weight:600; letter-spacing:-.3px; }
+  .brand-text .sub{ font-size:13px; line-height:18px; color:var(--label-2); font-weight:400; }
+  .head-right{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+
+  /* control segmentado, al modo del de iOS: la pastilla se desliza */
+  .seg{ position:relative; display:inline-flex; align-items:center; gap:0;
+    background:var(--gray-5); border-radius:var(--r-pill); padding:3px; flex:0 0 auto; }
+  .seg button{ position:relative; z-index:1; border:none; background:none; cursor:pointer;
+    color:var(--label-2); font-size:13px; font-weight:600; line-height:18px;
+    padding:5px 12px; border-radius:var(--r-pill); min-width:34px;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:color .25s var(--ease); }
+  .seg button.on{ color:var(--label); }
+  .seg-thumb{ position:absolute; top:3px; bottom:3px; border-radius:var(--r-pill);
+    background:var(--surface); box-shadow:0 1px 3px rgba(43,47,38,.16);
+    transition:transform .32s var(--ease), width .32s var(--ease); }
+
+  .tag-mockup{ background:var(--amarillo-bg); color:var(--label); font-size:12px; line-height:16px;
+    font-weight:600; padding:5px 12px; border-radius:var(--r-pill); }
+
+  main{max-width:2100px;margin:0 auto;padding:24px clamp(16px,2vw,32px) 64px;}
+  footer{max-width:2100px;margin:0 auto;padding:0 clamp(16px,2vw,32px) 40px;
+    font-size:13px;line-height:18px;color:var(--label-3);}
+
+  /* ---------- contadores ---------- */
+  .stats{ display:grid; grid-template-columns:repeat(auto-fit,minmax(172px,1fr)); gap:12px; margin-bottom:20px; }
+  .stat{ background:var(--surface); border:none; border-radius:var(--r-lg); padding:16px 18px;
+    cursor:pointer; text-align:left; color:inherit; box-shadow:var(--shadow-card);
+    transition:transform .18s var(--ease-snappy), box-shadow .18s var(--ease); }
+  .stat:hover{ box-shadow:var(--shadow-elevated); }
+  .stat:active{ transform:scale(.975); }
+  .stat.on{ box-shadow:var(--shadow-elevated), inset 0 0 0 2px currentColor; }
+  .stat .n{ font-size:28px; line-height:34px; font-weight:600; letter-spacing:-.5px; }
+  .stat .l{ font-size:13px; line-height:18px; color:var(--label-2); margin-top:2px; }
+  .stat.rojo{color:var(--rojo);} .stat.naranja{color:var(--naranja);} .stat.amarillo{color:var(--amarillo);}
+  .stat.verde{color:var(--verde);} .stat.gris{color:var(--gris);}
+  .stat .l{color:var(--label-2);}
+
+  /* ---------- leyendas ---------- */
+  .legend{ display:flex; flex-wrap:wrap; gap:8px 20px; align-items:center;
+    background:var(--surface); border-radius:var(--r-lg); padding:14px 18px; margin-bottom:14px;
+    font-size:15px; line-height:20px; color:var(--label-2); box-shadow:var(--shadow-card); }
+  .legend b{ color:var(--label); font-weight:600; }
+  .chip{ display:inline-flex; align-items:center; gap:7px; }
+  .dot{ width:10px; height:10px; border-radius:var(--r-pill); display:inline-block; flex:0 0 auto; }
+  .dot.verde{background:var(--verde);} .dot.amarillo{background:var(--amarillo);}
+  .dot.naranja{background:var(--naranja);} .dot.rojo{background:var(--rojo);}
+  .dot.gris{background:var(--gris);} .dot.negro{background:var(--negro);}
+
+  .btn-pendientes{ margin-left:auto; display:inline-flex; align-items:center; gap:7px; border:none; background:color-mix(in srgb,var(--accent) 15%,transparent);
+    color:var(--accent-ink); padding:9px 16px; border-radius:var(--r-sm);
+    font-size:15px; font-weight:600; cursor:pointer; transition:transform .15s var(--ease-snappy); }
+  .btn-pendientes:active{ transform:scale(.96); }
+
+  .filtro-aviso{ display:none; align-items:center; gap:12px; background:var(--surface);
+    border-radius:var(--r-lg); padding:13px 18px; margin-bottom:16px;
+    font-size:15px; line-height:20px; color:var(--label-2); box-shadow:var(--shadow-card); }
+  .filtro-aviso.on{ display:flex; }
+  .filtro-aviso b{ color:var(--label); font-weight:600; }
+  .filtro-aviso button{ margin-left:auto; border:none; background:var(--gray-6); color:var(--label);
+    border-radius:var(--r-sm); padding:7px 14px; font-size:15px; font-weight:600; cursor:pointer; }
+
+  .search{ width:100%; padding:12px 16px; border:none; border-radius:var(--r-md);
+    font-size:17px; line-height:22px; background:var(--surface); color:var(--label);
+    margin-bottom:20px; box-shadow:var(--shadow-card); font-family:inherit; }
+  .search:focus{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .search::placeholder{ color:var(--label-3); }
+
+  /* ---------- tarjeta de empresa ---------- */
+  .company{ background:var(--surface); border-radius:var(--r-xl); margin-bottom:16px;
+    overflow:hidden; box-shadow:var(--shadow-card);
+    transition:opacity .25s var(--ease); }
+  .company-head{ padding:16px clamp(14px,1.5vw,20px); display:flex; align-items:center;
+    justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .company-title{ display:flex; align-items:center; gap:14px; min-width:0; }
+  .company-head h2{ font-size:20px; line-height:25px; margin:0; font-weight:600; letter-spacing:-.3px; }
+  .logo-emp{ height:52px; width:auto; max-width:160px; flex:0 0 auto;
+    border-radius:var(--r-md); background:#fff; object-fit:contain; padding:4px 7px;
+    box-shadow:0 1px 2px rgba(43,47,38,.08); }
+  .logo-fallback{ width:52px; height:52px; flex:0 0 auto; border-radius:var(--r-md);
+    background:var(--gray-6); color:var(--label-2);
+    display:flex; align-items:center; justify-content:center; font-weight:600; font-size:18px; }
+  .company-summary{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .badge{ display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
+    border-radius:var(--r-pill); font-size:13px; line-height:18px; font-weight:600; white-space:nowrap; }
+  .badge.verde{background:var(--verde-bg);color:var(--accent-ink);}
+  .badge.amarillo{background:var(--amarillo-bg);color:var(--amarillo);}
+  .badge.naranja{background:var(--naranja-bg);color:var(--naranja);}
+  .badge.rojo{background:var(--rojo-bg);color:var(--rojo);}
+  .badge.gris{background:var(--gris-bg);color:var(--label-2);}
+  .badge.negro{background:var(--negro-bg);color:var(--label-2);}
+
+  .ficha-link{ display:inline-flex; align-items:center; gap:6px; font-size:13px; line-height:18px;
+    font-weight:600; color:var(--accent-ink); text-decoration:none;
+    background:color-mix(in srgb,var(--accent) 13%,transparent);
+    padding:6px 12px; border-radius:var(--r-pill); }
+
+  .company-body{ padding:0 clamp(14px,1.5vw,20px) 16px; }
+
+  /* Predio | Transporte | Hidráulica */
+  .organismos{ display:flex; flex-wrap:wrap; gap:20px; margin-top:8px; align-items:flex-start; }
+  .org-col{ flex:1 1 300px; min-width:min(300px,100%); }
+  .org-label{ font-size:13px; line-height:18px; font-weight:600; margin:0 0 10px 2px;
+    display:flex; align-items:center; gap:7px; color:var(--label-2); }
+  .org-label::before{ content:""; width:8px; height:8px; border-radius:var(--r-pill); }
+  .org-label.ambiente::before{ background:var(--accent); }
+  .org-label.transporte::before{ background:var(--naranja); }
+  .org-label.hidraulica::before{ background:var(--azul); }
+  .org-label .cant{ color:var(--label-3); font-weight:400; }
+
+  .tiles{ display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:12px; }
+  .tile{ background:var(--surface-2); border-radius:var(--r-md); padding:14px 16px; }
+  .tile-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .tile-label{ font-size:16px; line-height:21px; font-weight:600; letter-spacing:-.2px; }
+  .tipo-chip{ font-size:11px; line-height:15px; font-weight:600; color:var(--label-3);
+    white-space:nowrap; flex:0 0 auto; }
+  .exp-row{ display:flex; align-items:center; gap:8px; margin:4px 0 10px; }
+  .tile-exp{ font-size:13px; line-height:18px; color:var(--label-2);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .btn-hab{ flex:0 0 auto; border:none; background:var(--gray-5); color:var(--label-2);
+    border-radius:var(--r-pill); width:26px; height:26px; display:inline-flex; align-items:center;
+    justify-content:center; cursor:pointer; font-size:13px; transition:transform .15s var(--ease-snappy); }
+  .btn-hab:hover{ background:color-mix(in srgb,var(--accent) 18%,transparent); color:var(--accent-ink); }
+  .btn-hab:active{ transform:scale(.9); }
+  .tile-venc{ font-size:13px; }
+  .doc-link{ display:inline-flex; align-items:center; gap:6px; margin-top:8px;
+    font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink); text-decoration:none; }
+  .doc-link:hover{ text-decoration:underline; }
+
+  .aviso-mail .icon{ flex:0 0 auto; }
+  .aviso-mail{ margin-top:10px; font-size:13px; line-height:18px; border-radius:var(--r-sm);
+    padding:9px 11px; display:flex; gap:7px; align-items:center; }
+  .aviso-mail.naranja{ background:var(--naranja-bg); color:var(--naranja); }
+  .aviso-mail.amarillo{ background:var(--amarillo-bg); color:var(--amarillo); }
+  .aviso-mail button{ margin-left:auto; flex:0 0 auto; border:none; background:rgba(0,0,0,.07);
+    color:inherit; border-radius:var(--r-pill); padding:4px 11px; font-size:12px; font-weight:600; cursor:pointer; }
+  .resp{ margin-top:8px; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
+    background:var(--verde-bg); border-radius:var(--r-sm); padding:8px 11px;
+    display:flex; align-items:center; gap:7px; }
+  .hab-nueva{ margin-top:8px; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
+    background:var(--verde-bg); border-radius:var(--r-sm); padding:8px 11px;
+    display:flex; align-items:center; gap:7px; }
+
+  .tile-estado-txt{ font-size:15px; line-height:20px; color:var(--label-2); margin-top:10px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .tile-extra{ display:none; margin-top:12px; padding-top:12px;
+    border-top:.5px solid var(--separator); font-size:15px; line-height:20px; color:var(--label-2); }
+  .tile-extra b{ color:var(--label); font-weight:600; }
+  .tile-extra > div{ margin-bottom:6px; }
+  .company.show-n3 .tile-extra{ display:block; }
+  .company.show-n3 .tile-estado-txt{ display:none; }
+
+  .obs-edit{ width:100%; margin-top:6px; min-height:60px; resize:vertical;
+    border:none; border-radius:var(--r-sm); padding:10px 12px; background:var(--surface);
+    font-family:inherit; font-size:15px; line-height:20px; color:var(--label); }
+  .obs-edit:focus{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .obs-edit::placeholder{ color:var(--label-3); }
+  .obs-guardado{ font-size:12px; line-height:16px; color:var(--accent-ink); font-weight:600;
+    margin-top:4px; opacity:0; transition:opacity .2s var(--ease); }
+  .obs-guardado.on{ opacity:1; }
+
+  .toggles{ display:flex; gap:10px; padding:14px clamp(14px,1.5vw,20px);
+    border-top:.5px solid var(--separator); flex-wrap:wrap; }
+  .toggle-btn, .btn-pausa{ border:none; background:var(--gray-6); color:var(--label);
+    padding:9px 15px; border-radius:var(--r-sm); font-size:15px; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; gap:7px; transition:transform .15s var(--ease-snappy); }
+  .toggle-btn:active, .btn-pausa:active{ transform:scale(.96); }
+  .toggle-btn .chev{ transition:transform .25s var(--ease); display:inline-flex; }
+  .toggle-btn.active{ background:color-mix(in srgb,var(--accent) 15%,transparent); color:var(--accent-ink); }
+  .toggle-btn.active .chev{ transform:rotate(180deg); }
+
+  .nivel2, .nivel3{ display:none; padding:0 clamp(14px,1.5vw,20px) 16px; }
+  .company.show-n2 .nivel2{ display:block; }
+  .company.show-n3 .nivel3{ display:block; }
+  .nivel3 .datos-empresa{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+    gap:14px; background:var(--surface-2); border-radius:var(--r-md); padding:16px; }
+  .datos-empresa .campo .k{ font-size:13px; line-height:18px; color:var(--label-2); }
+  .datos-empresa .campo .v{ font-size:17px; line-height:22px; margin-top:2px; }
+  .datos-empresa .campo .v.empty{ color:var(--label-3); }
+  .empty-hint{ font-size:15px; line-height:20px; color:var(--label-3); padding:8px 2px; }
+
+  /* ---------- franja de auditoría ---------- */
+  .auditoria{ padding:14px clamp(14px,1.5vw,20px); }
+  .aud-main{ display:flex; align-items:center; justify-content:space-between; gap:14px; }
+  .auditoria .info{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; min-width:0; }
+  .auditoria .k{ font-size:12px; line-height:16px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.4px; opacity:.7; }
+  .auditoria .fecha{ font-size:17px; line-height:22px; font-weight:600; letter-spacing:-.2px; }
+  .auditoria .dias{ font-size:15px; line-height:20px; opacity:.85; }
+  .auditoria .frec{ font-size:13px; line-height:18px; opacity:.7; }
+  .auditoria .nota{ font-size:13px; line-height:18px; opacity:.75; display:block; margin-top:6px; }
+  .auditoria button{ border:none; background:rgba(255,255,255,.22); color:inherit;
+    padding:9px 16px; border-radius:var(--r-sm); font-size:15px; font-weight:600; cursor:pointer;
+    white-space:nowrap; flex:0 0 auto; display:inline-flex; align-items:center; gap:7px;
+    transition:transform .15s var(--ease-snappy); }
+  .auditoria button:hover{ background:rgba(255,255,255,.32); }
+  .auditoria button:active{ transform:scale(.96); }
+  .auditoria.verde{ background:var(--verde); color:var(--on-verde); }
+  .auditoria.amarillo{ background:var(--amarillo); color:var(--on-amarillo); }
+  .auditoria.naranja{ background:var(--naranja); color:var(--on-naranja); }
+  .auditoria.rojo{ background:var(--rojo); color:var(--on-rojo); }
+  .auditoria.negro{ background:var(--negro); color:var(--on-negro); }
+  .auditoria.gris{ background:var(--gris); color:var(--on-gris); }
+  .auditoria.porconfirmar{ background:var(--azul); color:var(--on-azul); }
+
+  /* ---------- servicio pausado ---------- */
+  .company.paused{ opacity:.6; }
+  .company.paused .company-body, .company.paused .nivel2, .company.paused .nivel3,
+  .company.paused .auditoria, .company.paused .logo-emp{ filter:grayscale(1); }
+  .company.paused .auditoria{ background:var(--gris) !important; color:#fff !important; }
+  .company.paused .btn-pausa{ background:color-mix(in srgb,var(--accent) 15%,transparent); color:var(--accent-ink); }
+
+  /* ---------- hoja modal, al modo de una sheet de iOS ---------- */
+  #modalOverlay{ display:none; position:fixed; inset:0; background:rgba(20,23,15,.42);
+    -webkit-backdrop-filter:blur(10px) saturate(140%); backdrop-filter:blur(10px) saturate(140%);
+    align-items:center; justify-content:center; padding:24px; z-index:80; }
+  #modalOverlay.on{ display:flex; animation:velo .3s var(--ease); }
+  @keyframes velo{ from{opacity:0} to{opacity:1} }
+
+  #modalCard{ background:var(--bg); border-radius:var(--r-xl); width:100%; max-width:520px;
+    max-height:min(82vh,780px); display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:var(--shadow-elevated); animation:hoja .42s var(--ease); }
+  @keyframes hoja{ from{opacity:0; transform:translateY(22px) scale(.97)} to{opacity:1; transform:none} }
+  #modalCard.ancho{ max-width:700px; }
+
+  /* cabecera fija, sobre material translucido */
+  #modalHead{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:18px 20px 14px; background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    position:relative; z-index:1;
+    box-shadow:inset 0 1px 1px var(--glass-highlight), 0 1px 0 var(--separator); }
+  #modalHead h2{ margin:0; font-size:20px; line-height:25px; font-weight:600; letter-spacing:-.35px; }
+  #modalCerrar{ border:none; background:var(--gray-5); color:var(--label-2); cursor:pointer;
+    width:28px; height:28px; border-radius:var(--r-pill); flex:0 0 auto;
+    display:inline-flex; align-items:center; justify-content:center; font-size:12px;
+    transition:transform .15s var(--ease-snappy), background .15s var(--ease); }
+  #modalCerrar:hover{ background:var(--separator); color:var(--label); }
+  #modalCerrar:active{ transform:scale(.88); }
+
+  #modalLista{ overflow-y:auto; padding:4px 20px 20px; -webkit-overflow-scrolling:touch; }
+
+  /* lista agrupada: cada grupo es un bloque redondeado sobre el fondo de la hoja */
+  .pend-grupo{ font-size:13px; line-height:18px; font-weight:600; color:var(--label-2);
+    text-transform:uppercase; letter-spacing:.4px; margin:20px 4px 7px; }
+  .pend-grupo:first-child{ margin-top:14px; }
+  .pend-card{ background:var(--surface); border-radius:var(--r-md); overflow:hidden;
+    box-shadow:0 1px 2px rgba(43,47,38,.05); }
+  .pend{ display:flex; align-items:center; gap:12px; padding:0 16px;
+    min-height:46px; position:relative; }
+  /* separador con sangria, como en las listas del sistema */
+  .pend + .pend::before{ content:""; position:absolute; left:40px; right:0; top:0;
+    height:.5px; background:var(--separator); }
+  .pend .pt{ width:10px; height:10px; border-radius:var(--r-pill); flex:0 0 auto; }
+  .pend .nom{ font-size:17px; line-height:22px; flex:1 1 auto; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pend .det{ font-size:15px; line-height:20px; color:var(--label-2); white-space:nowrap;
+    font-variant-numeric:tabular-nums; }
+
+  #modalPie{ display:flex; align-items:center; gap:12px; padding:14px 20px;
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    box-shadow:inset 0 1px 1px var(--glass-highlight), 0 -1px 0 var(--separator); }
+  #btnCopiar{ margin-left:auto; display:inline-flex; align-items:center; gap:8px; border:none;
+    background:var(--accent); color:#fff; padding:12px 22px; border-radius:var(--r-md);
+    font-size:17px; font-weight:600; cursor:pointer; transition:transform .15s var(--ease-snappy); }
+  #btnCopiar:active{ transform:scale(.96); }
+  #copiaOk{ font-size:15px; font-weight:600; color:var(--accent-ink);
+    opacity:0; transition:opacity .2s var(--ease); }
+  #copiaOk.on{ opacity:1; }
+  #mailPrev{ background:var(--gray-6); padding:16px; border-radius:var(--r-md); margin-top:12px; }
+
+  /* en pantallas chicas se comporta como bottom sheet */
+  @media (max-width:560px){
+    #modalOverlay{ padding:0; align-items:flex-end; }
+    #modalCard{ max-width:none; max-height:88vh;
+      border-radius:var(--r-xl) var(--r-xl) 0 0; animation:hojaAbajo .42s var(--ease); }
+    @keyframes hojaAbajo{ from{transform:translateY(100%)} to{transform:none} }
+    #modalHead::before{ content:""; position:absolute; top:7px; left:50%; transform:translateX(-50%);
+      width:36px; height:5px; border-radius:var(--r-pill); background:var(--separator); }
+    #modalHead{ padding-top:20px; }
+  }
+
+  /* ---------- login ---------- */
+  #dashboardScreen{ display:none; }
+  #loginScreen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .login-card{ background:var(--surface); border-radius:var(--r-xl); padding:40px 36px;
+    max-width:420px; width:100%; text-align:center; box-shadow:var(--shadow-elevated); }
+  .login-logo{ font-size:40px; margin-bottom:12px; }
+  #loginScreen h1{ font-size:22px; line-height:28px; font-weight:600; margin:0 0 8px; letter-spacing:-.35px; }
+  #loginScreen p{ font-size:15px; line-height:20px; color:var(--label-2); margin:0 0 24px; }
+  #gsiButton{ display:flex; justify-content:center; }
+  #loginSpinner{ display:none; font-size:15px; color:var(--label-2); margin-top:14px; }
+  #loginError{ display:none; font-size:15px; line-height:20px; color:var(--rojo); font-weight:600;
+    margin-top:14px; background:var(--rojo-bg); border-radius:var(--r-sm); padding:12px 14px; }
+  .account{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--label-2); }
+  .account b{ color:var(--accent-ink); font-weight:600; }
+  .account button{ border:none; background:var(--gray-5); color:var(--label-2); cursor:pointer;
+    border-radius:var(--r-pill); padding:5px 12px; font-size:13px; font-weight:600; }
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="logo login-logo">GH</div>
+    <h1>Vencimientos y Auditorías</h1>
+    <p>GH Consultora · Gestión Ambiental<br>
+       Iniciá sesión con una cuenta de Google autorizada para ver el panel.</p>
+    <div id="gsiButton"></div>
+    <div id="loginSpinner">Verificando acceso…</div>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div id="dashboardScreen">
+<header>
+  <div class="brand">
+    <div class="logo">GH</div>
+    <div class="brand-text">
+      <h1>Vencimientos y Auditorías</h1>
+      <div class="sub">GH Consultora · Seguimiento y control</div>
+    </div>
+  </div>
+  <div class="head-right">
+    <span class="account" id="account"><b id="accountEmail"></b><button type="button" id="btnSalir">Salir</button></span>
+    <div class="seg" id="temaSeg" role="group" aria-label="Tema">
+      <button type="button" data-tema="light" aria-label="Modo claro"></button>
+      <button type="button" data-tema="auto">Auto</button>
+      <button type="button" data-tema="dark" aria-label="Modo oscuro"></button>
+      <span class="seg-thumb" aria-hidden="true"></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="legend">
+    <b>Habilitaciones:</b>
+    <span class="chip"><span class="dot rojo"></span>Vencida</span>
+    <span class="chip"><span class="dot naranja"></span>Faltan ≤ 3 meses · mail de solicitud de renovación</span>
+    <span class="chip"><span class="dot amarillo"></span>3 meses + 1 semana · mail para definir responsable</span>
+    <span class="chip"><span class="dot verde"></span>Más de 3 meses y 1 semana</span>
+    <span class="chip"><span class="dot gris"></span>Sin fecha</span>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="filtro-aviso" id="filtroAviso">
+    <span id="filtroTexto"></span>
+    <button type="button" id="filtroLimpiar">Ver todo</button>
+  </div>
+
+  <div class="legend">
+    <b>Auditorías ambientales (ciclo mensual):</b>
+    <span class="chip"><span class="dot verde"></span>Al día</span>
+    <span class="chip"><span class="dot amarillo"></span>Faltan 2 semanas</span>
+    <span class="chip"><span class="dot naranja"></span>Falta 1 semana</span>
+    <span class="chip"><span class="dot rojo"></span>Cumplió el mes (hasta +1 semana)</span>
+    <span class="chip"><span class="dot negro"></span>Se pasó del mes</span>
+    <button type="button" id="btnPendientes" class="btn-pendientes">Ver auditorías pendientes</button>
+  </div>
+
+  <input class="search" id="search" placeholder="Buscar empresa...">
+
+  <div id="companies"></div>
+</main>
+
+<div id="modalOverlay">
+  <div id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <div id="modalHead">
+      <h2 id="modalTitulo">Auditorías por realizar</h2>
+      <button type="button" id="modalCerrar" aria-label="Cerrar"></button>
+    </div>
+    <div id="modalLista"></div>
+    <div id="modalPie">
+      <span id="copiaOk">Copiado</span>
+      <button type="button" id="btnCopiar">Copiar lista</button>
+    </div>
+  </div>
+</div>
+
+<footer>Mockup generado a partir de la copia de seguridad del 24/08/2026 · Solo para revisar la estructura visual. El botón de subir informe simula el comportamiento, no envía nada.</footer>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+/* ---------------------------------------------------------------
+   Shell publico: no contiene ningun dato de las empresas.
+   Todo llega del Web App de Apps Script, que valida el token de
+   Google contra la lista de casillas autorizadas antes de responder.
+   --------------------------------------------------------------- */
+const CLIENT_ID  = 'PENDIENTE.apps.googleusercontent.com';  // OAuth de info.ghconsultora
+const BACKEND_URL = 'PENDIENTE';                            // /exec del Web App
+
+let idToken = null;
+
+function llamarBackend(action, extra){
+  return fetch(BACKEND_URL, {
+    method:'POST',
+    body: JSON.stringify(Object.assign({ action, idToken }, extra || {}))
+  }).then(r => r.json());
+}
+
+window.onload = function(){
+  google.accounts.id.initialize({ client_id: CLIENT_ID, callback: alIniciarSesion });
+  google.accounts.id.renderButton(document.getElementById('gsiButton'),
+    { theme:'outline', size:'large', text:'signin_with', shape:'pill' });
+};
+
+function alIniciarSesion(resp){
+  idToken = resp.credential;
+  document.getElementById('gsiButton').style.display = 'none';
+  document.getElementById('loginSpinner').style.display = 'block';
+  document.getElementById('loginError').style.display = 'none';
+
+  llamarBackend('getData', {}).then(data=>{
+    document.getElementById('loginSpinner').style.display = 'none';
+    if(!data.ok){
+      idToken = null;
+      document.getElementById('gsiButton').style.display = 'block';
+      const err = document.getElementById('loginError');
+      err.textContent = 'Esta cuenta no está autorizada. Pedile a GH Consultora que agregue tu email a la lista.';
+      err.style.display = 'block';
+      return;
+    }
+    document.getElementById('accountEmail').textContent = data.email;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
+    EQUIPO = data.equipo || [];
+    arrancar({ generado: data.generado, empresas: data.empresas });
+  }).catch(()=>{
+    document.getElementById('loginSpinner').style.display = 'none';
+    document.getElementById('gsiButton').style.display = 'block';
+    const err = document.getElementById('loginError');
+    err.textContent = 'No se pudo conectar con el backend. Probá de nuevo en un momento.';
+    err.style.display = 'block';
+  });
+}
+
+const HOY = new Date(2026, 7, 24); // 24/08/2026
+
+// Iconos dibujados a mano en el mismo lenguaje que SF Symbols (trazo 1.7,
+// extremos redondeados). No se usa la fuente de Apple: no es licenciable para web.
+const ICONOS = {
+  arriba:'<path d="M8 10.5V3.4M8 3.4 5.4 6M8 3.4 10.6 6"/><path d="M2.9 9.9v1.9a1.2 1.2 0 0 0 1.2 1.2h7.8a1.2 1.2 0 0 0 1.2-1.2V9.9"/>',
+  sobre:'<rect x="2.2" y="3.6" width="11.6" height="8.8" rx="1.8"/><path d="m2.7 5 4.5 3.3a1.4 1.4 0 0 0 1.6 0L13.3 5"/>',
+  persona:'<circle cx="8" cy="5.4" r="2.4"/><path d="M3.4 13a4.6 4.6 0 0 1 9.2 0"/>',
+  check:'<path d="m3.4 8.4 3 3 6.2-6.6"/>',
+  pausa:'<path d="M6 3.6v8.8M10 3.6v8.8"/>',
+  play:'<path d="M5.6 3.7 12 8l-6.4 4.3z" stroke-linejoin="round"/>',
+  equis:'<path d="m4.4 4.4 7.2 7.2M11.6 4.4l-7.2 7.2"/>',
+  doc:'<path d="M4 2.6h4.6L12 6v7.4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3.6a1 1 0 0 1 1-1Z"/><path d="M8.4 2.8V6H11.7"/>',
+  carpeta:'<path d="M2.4 5.1a1.3 1.3 0 0 1 1.3-1.3h2.2l1.3 1.5h5.1a1.3 1.3 0 0 1 1.3 1.3v5.2a1.3 1.3 0 0 1-1.3 1.3H3.7a1.3 1.3 0 0 1-1.3-1.3z"/>',
+  chevron:'<path d="m4.4 6.2 3.6 3.6 3.6-3.6"/>',
+  sol:'<circle cx="8" cy="8" r="2.9"/><path d="M8 1.6v1.3M8 13.1v1.3M14.4 8h-1.3M2.9 8H1.6M12.5 3.5l-.9.9M4.4 11.6l-.9.9M12.5 12.5l-.9-.9M4.4 4.4l-.9-.9"/>',
+  luna:'<path d="M13.1 9.6A5.6 5.6 0 0 1 6.4 2.9a5.6 5.6 0 1 0 6.7 6.7Z"/>',
+  lista:'<path d="M6 4.6h7.4M6 8h7.4M6 11.4h7.4"/><path d="M3.1 4.6h.01M3.1 8h.01M3.1 11.4h.01"/>',
+  copiar:'<rect x="5.4" y="5.4" width="8" height="8" rx="1.6"/><path d="M10.6 5.4V4.2a1.6 1.6 0 0 0-1.6-1.6H4.2a1.6 1.6 0 0 0-1.6 1.6V9a1.6 1.6 0 0 0 1.6 1.6h1.2"/>',
+};
+function ico(nombre, tam){
+  return `<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+    stroke-linecap="round" aria-hidden="true"${tam?` style="width:${tam};height:${tam}"`:''}>${ICONOS[nombre]}</svg>`;
+}
+
+let FILTRO = null;   // 'rojo' | 'naranja' | 'amarillo' | 'verde' | 'gris' | null
+let BUSQUEDA = '';
+
+function arrancar(payload){
+  window.PAYLOAD = payload;
+  aplicar();
+  document.getElementById('search').addEventListener('input', e=>{
+    BUSQUEDA = e.target.value.trim().toLowerCase();
+    aplicar();
+  });
+  document.getElementById('filtroLimpiar').addEventListener('click', ()=>{
+    FILTRO = null; aplicar();
+  });
+
+  // Tema: claro / auto (sigue al sistema) / oscuro.
+  const seg = document.getElementById('temaSeg');
+  const thumb = seg.querySelector('.seg-thumb');
+  seg.querySelector('[data-tema="light"]').innerHTML = ico('sol');
+  seg.querySelector('[data-tema="dark"]').innerHTML = ico('luna');
+
+  function aplicarTema(t){
+    if(t === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', t);
+    seg.querySelectorAll('button').forEach(b=>{
+      const activo = b.dataset.tema === t;
+      b.classList.toggle('on', activo);
+      if(activo){
+        thumb.style.width = b.offsetWidth + 'px';
+        thumb.style.transform = `translateX(${b.offsetLeft - 3}px)`;
+      }
+    });
+  }
+  seg.querySelectorAll('button').forEach(b=>
+    b.addEventListener('click', ()=> aplicarTema(b.dataset.tema)));
+  aplicarTema('auto');
+  window.addEventListener('resize', ()=>{
+    const activo = seg.querySelector('button.on');
+    if(activo){ thumb.style.width = activo.offsetWidth + 'px';
+                thumb.style.transform = `translateX(${activo.offsetLeft - 3}px)`; }
+  });
+
+  const overlay = document.getElementById('modalOverlay');
+  document.getElementById('btnPendientes').addEventListener('click', abrirPendientes);
+  document.getElementById('modalCerrar').innerHTML = ico('equis');
+  document.getElementById('btnPendientes').insertAdjacentHTML('afterbegin', ico('lista') + ' ');
+  document.getElementById('btnCopiar').insertAdjacentHTML('afterbegin', ico('copiar') + ' ');
+  document.getElementById('modalCerrar').addEventListener('click', ()=> overlay.classList.remove('on'));
+  overlay.addEventListener('click', e=>{ if(e.target === overlay) overlay.classList.remove('on'); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') overlay.classList.remove('on'); });
+
+  document.getElementById('btnCopiar').addEventListener('click', async ()=>{
+    const txt = textoParaWhatsapp();
+    const ok = document.getElementById('copiaOk');
+    try{
+      await navigator.clipboard.writeText(txt);
+    }catch(err){
+      // Navegadores que no dan permiso al portapapeles: se copia con un textarea temporal.
+      const ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    ok.classList.add('on');
+    setTimeout(()=> ok.classList.remove('on'), 1800);
+  });
+}
+
+const FILTRO_LABEL = {
+  rojo:'vencidas', naranja:'que vencen en 3 meses o menos',
+  amarillo:'a 3 meses y una semana', verde:'vigentes', gris:'sin fecha cargada'
+};
+
+function aplicar(){
+  const todas = window.PAYLOAD.empresas
+    .filter(emp => emp.empresa.toLowerCase().includes(BUSQUEDA));
+  render(todas);
+
+  const aviso = document.getElementById('filtroAviso');
+  if(FILTRO){
+    const n = document.querySelectorAll('#companies .company').length;
+    document.getElementById('filtroTexto').innerHTML =
+      `Mostrando solo las habilitaciones <b>${FILTRO_LABEL[FILTRO]}</b> — ${n} empresa${n===1?'':'s'}.`;
+    aviso.classList.add('on');
+  } else {
+    aviso.classList.remove('on');
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- mails de renovacion ----------
+// Mismo molde que plantillaMailGH_ del backend de seguimiento de mediciones.
+const GH_VERDE = '#8dc63f', GH_VERDE_OSC = '#4a7a1e', GH_TINTA = '#2b2f26', GH_SUAVE = '#5b6058';
+
+// El equipo no va hardcodeado: este shell es publico. Lo manda el backend
+// una vez que el mail quedo validado contra la lista de autorizados.
+let EQUIPO = [];
+
+function filaMail(etiqueta, valor){
+  return `<tr>
+    <td style="padding:5px 12px 5px 0;color:${GH_SUAVE};font-size:13px;white-space:nowrap;">${escapeHtml(etiqueta)}</td>
+    <td style="padding:5px 0;color:${GH_TINTA};font-size:14px;font-weight:bold;">${escapeHtml(valor || '—')}</td>
+  </tr>`;
+}
+
+function marcoMail(titulo, bajada, cuerpo, pie){
+  return `
+  <div style="margin:0;padding:0;background:#f7f8f4;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f7f8f4;padding:18px 0;">
+  <tr><td align="center">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #dfe3da;border-radius:10px;overflow:hidden;">
+    <tr><td style="background:${GH_VERDE_OSC};padding:14px 20px;">
+      <div style="color:#ffffff;font-size:19px;font-weight:bold;letter-spacing:-.3px;">GH CONSULTORA</div>
+      <div style="color:${GH_VERDE};font-size:11px;letter-spacing:1px;text-transform:uppercase;">Gestión Ambiental</div>
+    </td></tr>
+    <tr><td style="padding:20px;">
+      <div style="font-size:17px;font-weight:bold;color:${GH_TINTA};margin-bottom:2px;">${titulo}</div>
+      <div style="font-size:13px;color:${GH_SUAVE};margin-bottom:14px;">${bajada}</div>
+      ${cuerpo}
+    </td></tr>
+    <tr><td style="background:#f2f6ec;padding:12px 20px;border-top:1px solid #dfe3da;color:${GH_SUAVE};font-size:11.5px;">${pie}</td></tr>
+  </table></td></tr></table></div>`;
+}
+
+function datosMail(empresa, it){
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+      ${filaMail('Empresa', empresa)}
+      ${filaMail('Habilitación', it.label)}
+      ${filaMail('Expediente', it.expediente)}
+      ${filaMail('Resolución', it.resolucion)}
+      ${filaMail('Vence', fmtFecha(it.vencimiento) + (it.dias_venc!=null ? ` (en ${it.dias_venc} días)` : ''))}
+    </table>`;
+}
+
+// 1er mail (amarillo): va a todo el equipo, para que alguien se haga cargo.
+function mailAsignacion(empresa, it){
+  const botones = EQUIPO.map(p =>
+    `<a href="#" style="display:inline-block;margin:0 6px 6px 0;padding:8px 12px;background:#ffffff;
+       border:1px solid ${GH_VERDE_OSC};color:${GH_VERDE_OSC};border-radius:6px;text-decoration:none;
+       font-size:12.5px;font-weight:bold;">${escapeHtml(p.nombre)}</a>`).join('');
+  const cuerpo = datosMail(empresa, it) + `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:18px;">
+      <tr><td style="background:#eaf4e2;border-left:4px solid ${GH_VERDE_OSC};padding:12px 14px;">
+        <strong style="color:${GH_TINTA};font-size:14px;">¿Quién se hace cargo de la renovación?</strong>
+        <div style="margin-top:4px;color:${GH_SUAVE};font-size:12.5px;">
+          Al tocar tu nombre quedás anotado como responsable en la habilitación,
+          y los avisos siguientes te llegan solo a vos.</div>
+        <div style="margin-top:10px;">
+          <a href="#" style="display:inline-block;padding:9px 14px;background:${GH_VERDE_OSC};color:#ffffff;
+             border-radius:6px;text-decoration:none;font-size:13px;font-weight:bold;">✋ Me hago cargo</a>
+        </div>
+        <div style="margin-top:12px;color:${GH_SUAVE};font-size:11.5px;">O asignáselo a otra persona:</div>
+        <div style="margin-top:6px;">${botones}</div>
+      </td></tr>
+    </table>`;
+  return marcoMail(
+    'Renovación a definir responsable',
+    `Faltan ${it.dias_venc} días para que venza esta habilitación. Hay que definir quién gestiona la renovación.`,
+    cuerpo,
+    'Enviado automáticamente por el panel de vencimientos · 3 meses y 1 semana antes del vencimiento');
+}
+
+// 2do mail (naranja): solo al responsable ya asignado.
+function mailRenovacion(empresa, it){
+  const resp = it.responsable;
+  const cuerpo = datosMail(empresa, it) + `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:18px;">
+      <tr><td style="background:#fbe6d2;border-left:4px solid #c56a15;padding:12px 14px;">
+        <strong style="color:${GH_TINTA};font-size:14px;">Hay que presentar la solicitud de renovación</strong>
+        <div style="margin-top:4px;color:${GH_SUAVE};font-size:12.5px;">
+          Quedan ${it.dias_venc} días. Cuando la presentes, subí la nueva habilitación al panel.</div>
+      </td></tr>
+    </table>`;
+  return marcoMail(
+    'Presentar solicitud de renovación',
+    resp ? `${escapeHtml(resp)}, esta habilitación entra en los 3 meses previos al vencimiento.`
+         : 'Esta habilitación entra en los 3 meses previos al vencimiento.',
+    cuerpo,
+    resp ? `Enviado solo a ${escapeHtml(resp)}, responsable de esta gestión`
+         : 'Sin responsable asignado todavía — se envía a todo el equipo');
+}
+
+function verMail(empresa, it, tipo){
+  const overlay = document.getElementById('modalOverlay');
+  document.getElementById('modalCard').classList.add('ancho');
+  document.getElementById('modalTitulo').textContent =
+    tipo === 'asignacion' ? 'Mail: definir responsable' : 'Mail: solicitud de renovación';
+  document.getElementById('modalLista').innerHTML =
+    `<div id="mailPrev">${tipo === 'asignacion' ? mailAsignacion(empresa, it) : mailRenovacion(empresa, it)}</div>`;
+  document.getElementById('modalPie').style.display = 'none';
+  overlay.classList.add('on');
+}
+
+// ---------- auditorias pendientes ----------
+// Pendiente = todo lo que no esta al dia. Se ordena de lo mas atrasado a lo menos.
+const ORDEN_PEND = { negro:0, rojo:1, naranja:2, amarillo:3, gris:4 };  // 'verde' y 'porconfirmar' quedan afuera
+const PEND_TITULO = {
+  negro:'Se pasaron del mes', rojo:'Cumplieron el mes',
+  naranja:'Falta 1 semana', amarillo:'Faltan 2 semanas', gris:'Sin auditoría registrada'
+};
+const PEND_EMOJI = { negro:'⚫', rojo:'🔴', naranja:'🟠', amarillo:'🟡', gris:'⚪' };
+
+function auditoriasPendientes(){
+  return window.PAYLOAD.empresas
+    .filter(e => e.auditoria && ORDEN_PEND[e.auditoria.estado] !== undefined)
+    .map(e => ({ empresa:e.empresa, ...e.auditoria }))
+    .sort((a,b)=>
+      ORDEN_PEND[a.estado] - ORDEN_PEND[b.estado] ||
+      (b.dias ?? -1) - (a.dias ?? -1) ||
+      a.empresa.localeCompare(b.empresa));
+}
+
+function abrirPendientes(){
+  document.getElementById('modalCard').classList.remove('ancho');
+  document.getElementById('modalPie').style.display = '';
+  const pend = auditoriasPendientes();
+  const cont = document.getElementById('modalLista');
+  document.getElementById('modalTitulo').textContent =
+    `Auditorías por realizar (${pend.length})`;
+
+  if(!pend.length){
+    cont.innerHTML = '<div class="empty-hint">No hay auditorías pendientes.</div>';
+  } else {
+    let html = '', grupoActual = null;
+    pend.forEach(a=>{
+      if(a.estado !== grupoActual){
+        if(grupoActual !== null) html += '</div>';
+        grupoActual = a.estado;
+        html += `<div class="pend-grupo">${PEND_TITULO[a.estado]}</div><div class="pend-card">`;
+      }
+      const det = a.ultima
+        ? `${fmtFecha(a.ultima)} · hace ${a.dias} días`
+        : 'sin fecha registrada';
+      html += `<div class="pend">
+                 <span class="pt" style="background:var(--${a.estado})"></span>
+                 <span class="nom">${escapeHtml(a.empresa)}</span>
+                 <span class="det">${det}</span>
+               </div>`;
+    });
+    if(grupoActual !== null) html += '</div>';
+    cont.innerHTML = html;
+  }
+  document.getElementById('modalOverlay').classList.add('on');
+}
+
+function textoParaWhatsapp(){
+  const pend = auditoriasPendientes();
+  const hoy = fmtFecha(HOY.toISOString().slice(0,10));
+  let txt = `*Auditorías ambientales pendientes*\n_Al ${hoy} — ${pend.length} empresas_\n`;
+  let grupoActual = null;
+  pend.forEach(a=>{
+    if(a.estado !== grupoActual){
+      grupoActual = a.estado;
+      txt += `\n${PEND_EMOJI[a.estado]} *${PEND_TITULO[a.estado]}*\n`;
+    }
+    txt += a.ultima
+      ? `• ${a.empresa} — última ${fmtFecha(a.ultima)} (hace ${a.dias} días)\n`
+      : `• ${a.empresa} — sin fecha registrada\n`;
+  });
+  return txt;
+}
+
+function iniciales(nombre){
+  return nombre.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+}
+
+function fmtFecha(iso){
+  if(!iso) return null;
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function peorEstado(items){
+  const orden = {rojo:0, naranja:1, amarillo:2, verde:3, gris:4};
+  let peor = 'gris', hayDato = false;
+  items.forEach(it=>{
+    if(it.nivel!==1) return;
+    if(it.estado_semaforo !== 'gris') hayDato = true;
+    if(orden[it.estado_semaforo] < orden[peor]) peor = it.estado_semaforo;
+  });
+  return {peor, hayDato};
+}
+
+function contarPorEstado(empresas){
+  const c = {rojo:0, naranja:0, amarillo:0, verde:0, gris:0};
+  empresas.forEach(emp=>{
+    emp.items.filter(i=>i.nivel===1).forEach(it=>{ c[it.estado_semaforo]++; });
+  });
+  return c;
+}
+
+function iconoUpload(strip, input, alAplicar){
+  strip.addEventListener('click', ()=> input.click());
+  input.addEventListener('change', ()=>{ if(input.files.length) alAplicar(input.files[0].name); });
+}
+
+// Semaforo de auditorias: ciclo mensual. Rojo cubre la primera semana de atraso (30-36).
+function estadoAuditoria(dias, esporadica){
+  if(dias === null || dias === undefined) return 'gris';
+  if(esporadica) return 'esporadica';
+  if(dias <= 15) return 'verde';
+  if(dias <= 22) return 'amarillo';
+  if(dias <= 29) return 'naranja';
+  if(dias <= 36) return 'rojo';
+  return 'negro';
+}
+
+const AUD_LABEL = {
+  verde:'Al día', amarillo:'Faltan 2 semanas', naranja:'Falta 1 semana',
+  rojo:'Cumplió el mes', negro:'Se pasó del mes', gris:'Sin auditoría registrada',
+  porconfirmar:'Frecuencia a confirmar'
+};
+
+function tileHtml(it){
+  const vencLine = it.vencimiento
+    ? `<div class="tile-venc badge ${it.estado_semaforo}">${fmtFecha(it.vencimiento)}${it.venc_inferida ? ' *' : ''}</div>`
+    : `<div class="tile-venc badge gris">Sin vencimiento cargado</div>`;
+  const estadoTxt = it.estado_texto ? `<div class="tile-estado-txt">${escapeHtml(it.estado_texto)}</div>` : '';
+
+  // Accion que dispara el sistema segun la banda del semaforo.
+  const dv = it.dias_venc;
+  let avisoMail = '';
+  if(it.estado_semaforo === 'naranja'){
+    avisoMail = `<div class="aviso-mail naranja">${ico('sobre')} <span>Presentar solicitud de renovación${dv!=null?` — faltan ${dv} días`:''}</span>
+                   <button type="button" class="ver-mail" data-tipo="renovacion">Ver mail</button></div>`;
+  } else if(it.estado_semaforo === 'amarillo'){
+    avisoMail = `<div class="aviso-mail amarillo">${ico('sobre')} <span>Definir responsable de la renovación${dv!=null?` — faltan ${dv} días`:''}</span>
+                   <button type="button" class="ver-mail" data-tipo="asignacion">Ver mail</button></div>`;
+  }
+  const respLinea = it.responsable
+    ? `<div class="resp">${ico('persona')} Responsable: ${escapeHtml(it.responsable)}</div>` : '';
+
+  // La resolucion es el documento real de la habilitacion: si tiene link, va visible.
+  const resLink = (it.resolucion && it.resolucion_url)
+    ? `<a class="doc-link" href="${escapeHtml(it.resolucion_url)}" target="_blank" rel="noopener">${ico('doc')}${escapeHtml(it.resolucion)}</a>`
+    : '';
+
+  const extra = [];
+  if(it.resolucion && !it.resolucion_url) extra.push(`<div><b>Resolución:</b> ${escapeHtml(it.resolucion)} <i>(sin archivo vinculado)</i></div>`);
+  if(it.otorgada) extra.push(`<div><b>Otorgada:</b> ${fmtFecha(it.otorgada)}</div>`);
+  if(it.organismo) extra.push(`<div><b>Organismo:</b> ${escapeHtml(it.organismo)}</div>`);
+  if(it.evaluador) extra.push(`<div><b>Evaluador:</b> ${escapeHtml(it.evaluador)}</div>`);
+  if(it.pago) extra.push(`<div><b>Pago:</b> ${escapeHtml(it.pago)}</div>`);
+  if(it.deuda) extra.push(`<div><b>Deuda:</b> ${escapeHtml(it.deuda)}</div>`);
+  extra.push(
+    `<div><b>Estado</b>
+       <textarea class="obs-edit" placeholder="Sin estado cargado. Escribí acá para actualizar...">${escapeHtml(it.estado_texto || '')}</textarea>
+       <div class="obs-guardado">Guardado</div>
+     </div>`);
+  extra.push(
+    `<div><b>Observaciones</b>
+       <textarea class="obs-edit" placeholder="Sin observaciones. Escribí acá para agregar...">${escapeHtml(it.observaciones || '')}</textarea>
+       <div class="obs-guardado">Guardado</div>
+     </div>`);
+
+  return `<div class="tile">
+    <div class="tile-top">
+      <span class="tile-label">${escapeHtml(it.label)}</span>
+      ${it.grupo && it.grupo !== '—' ? `<span class="tipo-chip">${escapeHtml(it.grupo)}</span>` : ''}
+    </div>
+    <div class="exp-row">
+      <span class="tile-exp">${it.expediente ? 'Exp. ' + escapeHtml(it.expediente) : 'Sin expediente'}</span>
+      <button type="button" class="btn-hab" title="Subir nueva habilitación">${ico('arriba')}</button>
+      <input type="file" class="hab-input" hidden accept=".pdf,.doc,.docx,.jpg,.png">
+    </div>
+    ${vencLine}
+    ${resLink}
+    ${avisoMail}
+    ${respLinea}
+    ${estadoTxt}
+    ${extra.length ? `<div class="tile-extra">${extra.join('')}</div>` : ''}
+  </div>`;
+}
+
+function auditoriaHtml(a){
+  const estado = a.estado;
+  const fecha = a.ultima ? fmtFecha(a.ultima) : 'Sin registrar';
+  const dias = (a.dias === null || a.dias === undefined) ? '' :
+    `<span class="dias">hace ${a.dias} días · ${AUD_LABEL[estado]}</span>`;
+  const frec = `<span class="frec">· ${a.frecuencia}${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
+  const nota = a.nota ? `<span class="nota">${escapeHtml(a.nota)}</span>` : '';
+  return `
+    <div class="auditoria ${estado}">
+      <div class="aud-main">
+        <div class="info">
+          <span class="k">Auditoría ambiental</span>
+          <span class="fecha">${fecha}</span>
+          ${dias}
+          ${frec}
+        </div>
+        <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
+        <input type="file" class="file-input" hidden accept=".pdf,.doc,.docx">
+      </div>
+      ${nota}
+    </div>`;
+}
+
+function render(empresas){
+  const c = contarPorEstado(empresas);
+  const stats = document.getElementById('stats');
+  const def = [
+    ['rojo','Vencidas'], ['naranja','Faltan ≤ 3 meses'], ['amarillo','3 meses + 1 semana'],
+    ['verde','Vigentes'], ['gris','Sin fecha'],
+  ];
+  stats.innerHTML = def.map(([k,label])=>
+    `<button type="button" class="stat ${k}${FILTRO===k?' on':''}" data-estado="${k}">
+       <div class="n">${c[k]}</div><div class="l">${label}</div>
+     </button>`).join('');
+  stats.querySelectorAll('.stat').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const e = b.dataset.estado;
+      FILTRO = (FILTRO === e) ? null : e;   // volver a clickear lo apaga
+      aplicar();
+    });
+  });
+
+  const cont = document.getElementById('companies');
+  cont.innerHTML = '';
+
+  empresas.forEach(emp=>{
+    let n1 = emp.items.filter(i=>i.nivel===1);
+    // Si hay un filtro activo, la empresa muestra solo los casos de ese estado.
+    if(FILTRO){
+      n1 = n1.filter(i=>i.estado_semaforo === FILTRO);
+      if(!n1.length) return;   // empresa sin casos de ese estado: no se muestra
+    }
+    const n2 = emp.items.filter(i=>i.nivel===2);
+    const {peor, hayDato} = peorEstado(n1);
+
+    // Tres columnas: Ambiente se parte en Predio y Transporte; Hidraulica aparte.
+    const cols = [
+      ['Ambiente · Predio',     'ambiente',   n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='PREDIO')],
+      ['Ambiente · Transporte', 'transporte', n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='TRANSPORTE')],
+      ['Hidráulica',            'hidraulica', n1.filter(i=>i.organismo_grupo==='HIDRÁULICA')],
+    ].filter(([,,items])=>items.length);
+
+    const gruposHtml = cols.length
+      ? `<div class="organismos">
+           ${cols.map(([label,cls,items])=>`
+             <div class="org-col" style="flex-grow:${Math.min(items.length,3)}">
+               <div class="org-label ${cls}">${label} <span class="cant">(${items.length})</span></div>
+               <div class="tiles">${items.map(tileHtml).join('')}</div>
+             </div>`).join('')}
+         </div>`
+      : `<div class="empty-hint">Sin habilitaciones cruciales cargadas.</div>`;
+
+    const n2Html = n2.length
+      ? `<div class="tiles">${n2.map(tileHtml).join('')}</div>`
+      : `<div class="empty-hint">Sin habilitaciones municipales / bomberos cargadas.</div>`;
+
+    const badgeLabel = !hayDato ? 'Sin fechas cargadas'
+      : peor === 'rojo' ? 'Tiene vencidas'
+      : peor === 'naranja' ? 'Vence pronto (≤60d)'
+      : peor === 'amarillo' ? 'Vence en ≤90d'
+      : 'Al día';
+
+    const card = document.createElement('div');
+    card.className = 'company';
+    card.innerHTML = `
+      <div class="company-head">
+        <div class="company-title">
+          ${emp.logo
+            ? `<img class="logo-emp" src="${escapeHtml(emp.logo)}" alt="${escapeHtml(emp.empresa)}">`
+            : `<div class="logo-fallback">${escapeHtml(iniciales(emp.empresa))}</div>`}
+          <h2>${escapeHtml(emp.empresa)}</h2>
+        </div>
+        <div class="company-summary">
+          ${emp.ficha_url ? `<a class="ficha-link" href="${escapeHtml(emp.ficha_url)}" target="_blank" rel="noopener">${ico('carpeta')}Ficha de la empresa</a>` : ''}
+          <span class="badge ${peor}"><span class="dot ${peor}"></span>${badgeLabel}</span>
+        </div>
+      </div>
+      <div class="company-body">${gruposHtml}</div>
+      <div class="toggles">
+        <button class="toggle-btn btn-n2" type="button">Municipalidad y bomberos <span class="chev">${ico('chevron')}</span></button>
+        <button class="toggle-btn btn-n3" type="button">Info adicional <span class="chev">${ico('chevron')}</span></button>
+        <button class="btn-pausa" type="button">${ico('pausa')} Pausar servicio</button>
+      </div>
+      <div class="nivel2">${n2Html}</div>
+      <div class="nivel3">
+        <div class="datos-empresa">
+          <div class="campo"><div class="k">CUIT</div><div class="v empty">sin cargar</div></div>
+          <div class="campo"><div class="k">Contacto</div><div class="v empty">sin cargar</div></div>
+        </div>
+      </div>
+      ${emp.auditoria ? auditoriaHtml(emp.auditoria) : ''}
+    `;
+
+    card.querySelector('.btn-n2').addEventListener('click', ()=>{
+      card.classList.toggle('show-n2');
+      card.querySelector('.btn-n2').classList.toggle('active');
+    });
+    card.querySelector('.btn-n3').addEventListener('click', ()=>{
+      card.classList.toggle('show-n3');
+      card.querySelector('.btn-n3').classList.toggle('active');
+    });
+
+    // Preview del mail que dispara cada aviso.
+    card.querySelectorAll('.ver-mail').forEach((btn, i)=>{
+      btn.addEventListener('click', ()=>{
+        const tile = btn.closest('.tile');
+        const idx = [...card.querySelectorAll('.tile')].indexOf(tile);
+        const it = emp.items[idx];
+        verMail(emp.empresa, it, btn.dataset.tipo);
+
+        // En el mail de asignacion, tocar un nombre lo deja anotado en la habilitacion.
+        document.querySelectorAll('#mailPrev a').forEach(a=>{
+          a.addEventListener('click', ev=>{
+            ev.preventDefault();
+            const txt = a.textContent.trim();
+            it.responsable = txt.startsWith('✋') ? 'Vos' : txt;
+            document.getElementById('modalOverlay').classList.remove('on');
+            aplicar();
+          });
+        });
+      });
+    });
+
+    // Subida de una nueva habilitacion, al lado de cada expediente.
+    card.querySelectorAll('.exp-row').forEach(fila=>{
+      const input = fila.querySelector('.hab-input');
+      fila.querySelector('.btn-hab').addEventListener('click', ()=> input.click());
+      input.addEventListener('change', ()=>{
+        if(!input.files.length) return;
+        const tile = fila.closest('.tile');
+        let ok = tile.querySelector('.hab-nueva');
+        if(!ok){
+          ok = document.createElement('div');
+          ok.className = 'hab-nueva';
+          fila.insertAdjacentElement('afterend', ok);
+        }
+        ok.innerHTML = ico('check') + ' Nueva habilitación: ' + escapeHtml(input.files[0].name) + ' — falta cargar fechas';
+      });
+    });
+
+    // Pausa del servicio: deja toda la tarjeta en gris.
+    const btnPausa = card.querySelector('.btn-pausa');
+    btnPausa.addEventListener('click', ()=>{
+      const pausada = card.classList.toggle('paused');
+      btnPausa.innerHTML = pausada ? ico('play') + ' Reanudar servicio' : ico('pausa') + ' Pausar servicio';
+      const badge = card.querySelector('.company-summary .badge');
+      if(pausada){
+        badge.dataset.prev = badge.className + '|' + badge.innerHTML;
+        badge.className = 'badge gris';
+        badge.innerHTML = '<span class="dot gris"></span>Servicio pausado';
+      } else if(badge.dataset.prev){
+        const [cls, html] = badge.dataset.prev.split('|');
+        badge.className = cls; badge.innerHTML = html;
+      }
+    });
+
+    // Observaciones editables (mockup: solo memoria del navegador).
+    card.querySelectorAll('.obs-edit').forEach(ta=>{
+      const aviso = ta.parentElement.querySelector('.obs-guardado');
+      let t;
+      ta.addEventListener('input', ()=>{
+        clearTimeout(t);
+        t = setTimeout(()=>{
+          aviso.classList.add('on');
+          setTimeout(()=> aviso.classList.remove('on'), 1600);
+        }, 600);
+      });
+    });
+
+    // Simulacion local de la subida: actualiza fecha y pinta de verde.
+    const strip = card.querySelector('.auditoria');
+    if(strip){
+      const input = strip.querySelector('.file-input');
+      strip.querySelector('.btn-subir').addEventListener('click', ()=> input.click());
+      input.addEventListener('change', ()=>{
+        if(!input.files.length) return;
+        const nombre = input.files[0].name;
+        strip.className = 'auditoria verde';
+        strip.querySelector('.fecha').textContent = fmtFecha(HOY.toISOString().slice(0,10));
+        const dias = strip.querySelector('.dias');
+        if(dias) dias.textContent = 'hace 0 días · Al día';
+        const nota = strip.querySelector('.nota');
+        if(nota) nota.textContent = nombre;
+        else strip.insertAdjacentHTML('beforeend', `<span class="nota">${escapeHtml(nombre)}</span>`);
+      });
+    }
+
+    cont.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
