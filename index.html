@@ -278,7 +278,16 @@
     gap:14px; background:var(--surface-2); border-radius:var(--r-md); padding:16px; }
   .datos-empresa .campo .k{ font-size:13px; line-height:18px; color:var(--label-2); }
   .datos-empresa .campo .v{ font-size:17px; line-height:22px; margin-top:2px; }
-  .datos-empresa .campo .v.empty{ color:var(--label-3); }
+  .datos-empresa .campo .v.empty{ color:var(--label-3); font-style:italic; }
+  /* valor que se edita con doble clic, no una caja de texto permanente */
+  .datos-empresa .campo .v{ border-radius:6px; padding:2px 6px; margin-left:-6px;
+    cursor:text; transition:background .15s var(--ease); }
+  .datos-empresa .campo .v:hover{ background:var(--gray-6); }
+  .datos-empresa .campo .v[contenteditable="true"]{
+    background:var(--surface); outline:2px solid var(--accent); outline-offset:0;
+    font-style:normal; color:var(--label); cursor:text; }
+  .campo .pista{ font-size:11px; color:var(--label-3); margin-top:3px; display:none; }
+  .campo .pista.on{ display:block; }
   .empty-hint{ font-size:15px; line-height:20px; color:var(--label-3); padding:8px 2px; }
 
   /* ---------- franja de auditoría ---------- */
@@ -1064,8 +1073,12 @@ function render(empresas){
       <div class="nivel2">${n2Html}</div>
       <div class="nivel3">
         <div class="datos-empresa">
-          <div class="campo"><div class="k">CUIT</div><div class="v empty">sin cargar</div></div>
-          <div class="campo"><div class="k">Contacto</div><div class="v empty">sin cargar</div></div>
+          <div class="campo"><div class="k">CUIT</div>
+            <div class="v ${emp.cuit?'':'empty'}" data-campo="cuit" title="Doble clic para editar">${escapeHtml(emp.cuit || 'sin cargar')}</div>
+            <div class="pista">Enter para guardar · Esc para cancelar</div></div>
+          <div class="campo"><div class="k">Contacto</div>
+            <div class="v ${emp.contacto?'':'empty'}" data-campo="contacto" title="Doble clic para editar">${escapeHtml(emp.contacto || 'sin cargar')}</div>
+            <div class="pista">Enter para guardar · Esc para cancelar</div></div>
         </div>
       </div>
       ${emp.auditoria ? auditoriaHtml(emp.auditoria) : ''}
@@ -1078,6 +1091,47 @@ function render(empresas){
     card.querySelector('.btn-n3').addEventListener('click', ()=>{
       card.classList.toggle('show-n3');
       card.querySelector('.btn-n3').classList.toggle('active');
+    });
+
+    // CUIT y contacto: doble clic para editar, Enter guarda, Esc cancela.
+    card.querySelectorAll('.datos-empresa .v').forEach(celda=>{
+      const campo = celda.dataset.campo;
+      const pista = celda.parentElement.querySelector('.pista');
+      let previo = null;
+
+      celda.addEventListener('dblclick', ()=>{
+        if(celda.isContentEditable) return;
+        previo = emp[campo] || '';
+        celda.textContent = previo;
+        celda.classList.remove('empty');
+        celda.contentEditable = 'true';
+        pista.classList.add('on');
+        celda.focus();
+        document.getSelection().selectAllChildren(celda);
+      });
+
+      function cerrar(guardar){
+        if(!celda.isContentEditable) return;
+        const valor = celda.textContent.trim();
+        celda.contentEditable = 'false';
+        pista.classList.remove('on');
+        if(guardar && valor !== previo){
+          emp[campo] = valor;
+          llamarBackend('setDatoEmpresa', { fila: emp.fila, campo, valor })
+            .catch(()=>{ celda.textContent = previo || 'sin cargar'; });
+        } else if(!guardar){
+          emp[campo] = previo;
+        }
+        const v = emp[campo];
+        celda.textContent = v || 'sin cargar';
+        celda.classList.toggle('empty', !v);
+      }
+
+      celda.addEventListener('keydown', e=>{
+        if(e.key === 'Enter'){ e.preventDefault(); cerrar(true); }
+        if(e.key === 'Escape'){ e.preventDefault(); cerrar(false); }
+      });
+      celda.addEventListener('blur', ()=> cerrar(true));
     });
 
     // Preview del mail que dispara cada aviso.
