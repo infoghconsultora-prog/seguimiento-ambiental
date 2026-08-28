@@ -519,6 +519,7 @@
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js"></script>
 <script>
 /* ---------------------------------------------------------------
    Shell publico: no contiene ningun dato de las empresas.
@@ -527,8 +528,75 @@
    --------------------------------------------------------------- */
 const CLIENT_ID  = '397447072902-nhbl4at1hhd41igam0hbq7p2kc0gt8up.apps.googleusercontent.com';
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k2o2gI_oDSOlDrkQs7PbMDNRvDEUR6ajoAhABSNVuCmHi9PpDNw/exec';
+// API key restringida a "Google Picker API", del mismo proyecto de Cloud
+// (gh-vencimientos) que el CLIENT_ID de arriba. Ver PROGRESS.md del backend.
+const PICKER_API_KEY = 'PENDIENTE_CONFIGURAR';
 
 let idToken = null;
+
+/* ---------- selector de carpeta de Drive para elegir donde guardar ---------- */
+// Mientras no estandaricemos nombres de carpeta/archivo, quien sube el
+// archivo elige a mano donde guardarlo dentro de la carpeta ya estandarizada
+// de la empresa (o crea una nueva ahí). Para eso el picker necesita, además
+// del idToken de login, un token de acceso con permiso de Drive.
+let driveAccessToken = null;
+let driveTokenClient = null;
+let pickerCargado = false;
+
+function cargarPicker(){
+  if(pickerCargado) return Promise.resolve();
+  return new Promise(resolve=>{
+    gapi.load('picker', ()=>{ pickerCargado = true; resolve(); });
+  });
+}
+
+function pedirAccessToken(){
+  return new Promise((resolve, reject)=>{
+    if(driveAccessToken){ resolve(driveAccessToken); return; }
+    if(!driveTokenClient){
+      driveTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: resp=>{
+          if(resp.error){ reject(resp); return; }
+          driveAccessToken = resp.access_token;
+          setTimeout(()=>{ driveAccessToken = null; }, (resp.expires_in - 60) * 1000);
+          resolve(driveAccessToken);
+        }
+      });
+    }
+    driveTokenClient.requestAccessToken();
+  });
+}
+
+// Abre el picker de Drive ya adentro de la carpeta de la empresa (folderId),
+// con la creación de carpetas nuevas habilitada. Devuelve {id, nombre} de lo
+// elegido, o null si se cancela.
+function elegirCarpeta(folderId){
+  return cargarPicker().then(()=> pedirAccessToken()).then(token=>{
+    return new Promise(resolve=>{
+      const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+        .setParent(folderId)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true)
+        .setMimeTypes('application/vnd.google-apps.folder');
+      const picker = new google.picker.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(token)
+        .setDeveloperKey(PICKER_API_KEY)
+        .setTitle('Elegí (o creá) la carpeta donde guardar el archivo')
+        .setCallback(data=>{
+          if(data.action === google.picker.Action.PICKED){
+            resolve({ id: data.docs[0].id, nombre: data.docs[0].name });
+          } else if(data.action === google.picker.Action.CANCEL){
+            resolve(null);
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    });
+  });
+}
 
 // Manda un archivo al backend en base64. El destino lo resuelve el backend
 // a partir del link de la resolucion (la carpeta del expediente).
@@ -956,15 +1024,6 @@ const AUD_LABEL = {
   porconfirmar:'Frecuencia a confirmar'
 };
 
-// Categorías donde, al subir una habilitación renovada, tiene sentido pedir
-// las fechas de otorgamiento/vencimiento a mano para recalcular el semáforo:
-// DIA, CA/CAA (en la planilla suele figurar como "Gen RRPP (CA)"), bomberos y
-// municipalidad (comparten categoría), CAD hidráulica.
-const CATEGORIAS_RENOVABLES = [
-  'dia', 'dia aviso de proyecto', 'caa', 'gen rrpp (ca)', 'gen. rrpp (ca)',
-  'municipal', 'habilitación', 'cad'
-];
-
 function tileHtml(it){
   const vencLine = it.vencimiento
     ? `<div class="tile-venc badge ${it.estado_semaforo}">${fmtFecha(it.vencimiento)}${it.venc_inferida ? ' *' : ''}</div>`
@@ -1246,12 +1305,18 @@ function render(empresas){
       });
     });
 
-    // Subida de una nueva habilitacion, al lado de cada expediente.
+    // Subida de una nueva habilitacion, al lado de cada expediente. Hasta que
+    // los nombres de carpeta/archivo estén estandarizados, quien sube el
+    // archivo elige a mano dónde va (o crea una carpeta nueva) dentro de la
+    // carpeta ya estandarizada de la empresa — no lo adivina el backend.
     card.querySelectorAll('.exp-row').forEach(fila=>{
       const input = fila.querySelector('.hab-input');
       fila.querySelector('.btn-hab').addEventListener('click', ()=> input.click());
       input.addEventListener('change', ()=>{
         if(!input.files.length) return;
+        const file = input.files[0];
+        input.value = '';   // para poder re-elegir el mismo archivo si hace falta reintentar
+
         const tile = fila.closest('.tile');
         const idx = [...card.querySelectorAll('.tile')].indexOf(tile);
         const it = emp.items[idx];
@@ -1261,44 +1326,53 @@ function render(empresas){
           ok.className = 'hab-nueva';
           fila.insertAdjacentElement('afterend', ok);
         }
-        ok.innerHTML = '<div class="linea">Subiendo ' + escapeHtml(input.files[0].name) + '…</div>';
-        subirAlBackend(input.files[0], {
-          empresa: emp.empresa,
-          expediente: it.expediente,
-          resolucionUrl: it.resolucion_url
-        }).then(r=>{
-          if(!r.ok){
-            ok.innerHTML = '<div class="linea">No se pudo subir: ' + escapeHtml(r.detalle || r.error) + '</div>';
+
+        if(!carpetas.carpetaId){
+          ok.innerHTML = '<div class="linea">No tengo la carpeta de esta empresa en Drive.</div>';
+          return;
+        }
+
+        ok.innerHTML = '<div class="linea">Elegí la carpeta donde guardar «' + escapeHtml(file.name) + '»…</div>';
+        elegirCarpeta(carpetas.carpetaId).then(carpeta=>{
+          if(!carpeta){
+            ok.innerHTML = '<div class="linea">Subida cancelada.</div>';
             return;
           }
-          const linea = '<div class="linea">' + ico('check') + ' Guardado en ' + escapeHtml(r.carpeta) +
-            ' — <a class="doc-link" href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">ver</a></div>';
-          if(!CATEGORIAS_RENOVABLES.includes(it.categoria)){
-            ok.innerHTML = linea;
-            return;
-          }
-          ok.innerHTML = linea + `
-            <div class="fechas-renovacion">
-              <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
-              <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
-              <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
-              <span class="fechas-guardado">Guardado</span>
-            </div>`;
-          const btnGuardar = ok.querySelector('.btn-guardar-fechas');
-          btnGuardar.addEventListener('click', ()=>{
-            const otorgada = ok.querySelector('.fecha-otorgada').value;
-            const vencimiento = ok.querySelector('.fecha-vencimiento').value;
-            if(!vencimiento) return;
-            btnGuardar.disabled = true;
-            llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento }).then(res=>{
-              btnGuardar.disabled = false;
-              if(res.ok){
-                ok.querySelector('.fechas-guardado').classList.add('on');
-                cargarDatos();
-              }
-            }).catch(()=>{ btnGuardar.disabled = false; });
-          });
-        }).catch(()=>{ ok.innerHTML = '<div class="linea">No se pudo subir. Probá de nuevo.</div>'; });
+          ok.innerHTML = '<div class="linea">Subiendo a «' + escapeHtml(carpeta.nombre) + '»…</div>';
+          subirAlBackend(file, { carpetaId: carpeta.id, empresa: emp.empresa }).then(r=>{
+            if(!r.ok){
+              ok.innerHTML = '<div class="linea">No se pudo subir: ' + escapeHtml(r.detalle || r.error) + '</div>';
+              return;
+            }
+            const linea = '<div class="linea">' + ico('check') + ' Guardado en ' + escapeHtml(r.carpeta) +
+              ' — <a class="doc-link" href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">ver</a></div>';
+            // Se pide la fecha de vencimiento para cualquier tipo de
+            // habilitación renovada, no solo para las categorías más comunes.
+            ok.innerHTML = linea + `
+              <div class="fechas-renovacion">
+                <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
+                <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
+                <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
+                <span class="fechas-guardado">Guardado</span>
+              </div>`;
+            const btnGuardar = ok.querySelector('.btn-guardar-fechas');
+            btnGuardar.addEventListener('click', ()=>{
+              const otorgada = ok.querySelector('.fecha-otorgada').value;
+              const vencimiento = ok.querySelector('.fecha-vencimiento').value;
+              if(!vencimiento) return;
+              btnGuardar.disabled = true;
+              llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento }).then(res=>{
+                btnGuardar.disabled = false;
+                if(res.ok){
+                  ok.querySelector('.fechas-guardado').classList.add('on');
+                  cargarDatos();
+                }
+              }).catch(()=>{ btnGuardar.disabled = false; });
+            });
+          }).catch(()=>{ ok.innerHTML = '<div class="linea">No se pudo subir. Probá de nuevo.</div>'; });
+        }).catch(()=>{
+          ok.innerHTML = '<div class="linea">No se pudo abrir el selector de carpetas de Drive. Probá de nuevo.</div>';
+        });
       });
     });
 
