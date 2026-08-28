@@ -192,11 +192,6 @@
   .badge.gris{background:var(--gris-bg);color:var(--label-2);}
   .badge.negro{background:var(--negro-bg);color:var(--label-2);}
 
-  .ficha-link{ display:inline-flex; align-items:center; gap:6px; font-size:13px; line-height:18px;
-    font-weight:600; color:var(--accent-ink); text-decoration:none;
-    background:color-mix(in srgb,var(--accent) 13%,transparent);
-    padding:6px 12px; border-radius:var(--r-pill); }
-
   /* Acceso directo a una carpeta de Drive: siempre icono solo, nunca texto. */
   .folder-btn{ display:inline-flex; align-items:center; justify-content:center;
     width:32px; height:32px; flex:0 0 auto; border:none; border-radius:var(--r-pill);
@@ -1086,7 +1081,6 @@ function render(empresas){
           <h2>${escapeHtml(emp.empresa)}</h2>
         </div>
         <div class="company-summary">
-          ${emp.ficha_url ? `<a class="ficha-link" href="${escapeHtml(emp.ficha_url)}" target="_blank" rel="noopener">${ico('carpeta')}Ficha de la empresa</a>` : ''}
           ${carpetas.carpeta ? `<a class="folder-btn" href="${escapeHtml(carpetas.carpeta)}" target="_blank" rel="noopener" title="Carpeta de la empresa en Drive" aria-label="Carpeta de la empresa en Drive">${ico('carpeta')}</a>` : ''}
           <span class="badge ${peor}"><span class="dot ${peor}"></span>${badgeLabel}</span>
         </div>
