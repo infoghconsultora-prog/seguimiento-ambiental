@@ -649,6 +649,7 @@ function alIniciarSesion(resp){
     document.getElementById('dashboardScreen').style.display = 'block';
     EQUIPO = data.equipo || [];
     arrancar({ generado: data.generado, empresas: data.empresas });
+    cargarCarpetas();
   }).catch(()=>{
     document.getElementById('loginSpinner').style.display = 'none';
     document.getElementById('gsiButton').style.display = 'block';
@@ -687,14 +688,32 @@ function ico(nombre, tam){
 let FILTRO = null;   // 'rojo' | 'naranja' | 'amarillo' | 'verde' | 'gris' | null
 let BUSQUEDA = '';
 
-// Vuelve a pedir todo al backend (habilitaciones, auditorías, carpetas) y
-// redibuja. Se usa desde el botón "Actualizar" general y después de guardar
-// las fechas de una renovación, para que el semáforo quede al día.
+// Vuelve a pedir habilitaciones y auditorías al backend y redibuja. Las
+// carpetas de Drive que ya estén cacheadas viajan igual, pero no se
+// recalculan acá — eso es cargarCarpetas(). Se usa desde el botón
+// "Actualizar" general y después de guardar las fechas de una renovación,
+// para que el semáforo quede al día.
 function cargarDatos(){
   return llamarBackend('getData', {}).then(data=>{
     if(data.ok){
       EQUIPO = data.equipo || [];
       window.PAYLOAD = { generado: data.generado, empresas: data.empresas };
+      aplicar();
+    }
+    return data;
+  });
+}
+
+// Recorre las carpetas de Drive de las 24 empresas (accesos a Predio,
+// Transporte, Hidráulica, Auditorías). Puede tardar si el cache del backend
+// venció, así que se pide aparte y en segundo plano después del login — el
+// panel ya se ve con los datos de habilitaciones/auditorías sin esperarla.
+function cargarCarpetas(){
+  return llamarBackend('getCarpetas', {}).then(data=>{
+    if(data.ok && window.PAYLOAD){
+      window.PAYLOAD.empresas.forEach(emp=>{
+        emp.carpetas = data.carpetas[emp.empresa] || emp.carpetas || null;
+      });
       aplicar();
     }
     return data;
