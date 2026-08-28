@@ -1221,7 +1221,7 @@ function render(empresas){
       input.addEventListener('change', ()=>{
         if(!input.files.length) return;
         const nombre = input.files[0].name;
-        subirAlBackend(input.files[0], { empresa: emp.empresa, expediente: null, resolucionUrl: emp.ficha_url })
+        subirAlBackend(input.files[0], { empresa: emp.empresa, tipo: 'auditoria' })
           .then(()=> llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: nombre }))
           .catch(()=>{});
         strip.className = 'auditoria verde';
