@@ -958,8 +958,12 @@ const AUD_LABEL = {
 
 // Categorías donde, al subir una habilitación renovada, tiene sentido pedir
 // las fechas de otorgamiento/vencimiento a mano para recalcular el semáforo:
-// DIA, CA (CAA), bomberos y municipalidad (comparten categoría), CAD hidráulica.
-const CATEGORIAS_RENOVABLES = ['dia', 'dia aviso de proyecto', 'caa', 'municipal', 'habilitación', 'cad'];
+// DIA, CA/CAA (en la planilla suele figurar como "Gen RRPP (CA)"), bomberos y
+// municipalidad (comparten categoría), CAD hidráulica.
+const CATEGORIAS_RENOVABLES = [
+  'dia', 'dia aviso de proyecto', 'caa', 'gen rrpp (ca)', 'gen. rrpp (ca)',
+  'municipal', 'habilitación', 'cad'
+];
 
 function tileHtml(it){
   const vencLine = it.vencimiento
