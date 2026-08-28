@@ -679,9 +679,18 @@ function alIniciarSesion(resp){
   document.getElementById('gsiButton').style.display = 'none';
   document.getElementById('loginError').style.display = 'none';
   iniciarCargaVisual();
+  intentarLogin(true);
+}
 
+// A veces el primer pedido justo después de que actualizamos el backend
+// falla solo (arranque en frío del lado de Apps Script) y ya funciona de
+// nuevo al toque — por eso reintenta una vez en silencio antes de mostrar
+// el error de "cuenta no autorizada", en vez de obligar a tocar de nuevo
+// el botón de Google.
+function intentarLogin(primerIntento){
   llamarBackend('getData', {}).then(data=>{
     if(!data.ok){
+      if(primerIntento) return intentarLogin(false);
       detenerCargaVisual();
       idToken = null;
       document.getElementById('gsiButton').style.display = 'block';
@@ -705,6 +714,7 @@ function alIniciarSesion(resp){
       arrancar({ generado: data.generado, empresas: data.empresas });
     });
   }).catch(()=>{
+    if(primerIntento) return intentarLogin(false);
     detenerCargaVisual();
     document.getElementById('gsiButton').style.display = 'block';
     const err = document.getElementById('loginError');
