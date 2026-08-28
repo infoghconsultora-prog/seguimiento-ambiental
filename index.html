@@ -423,7 +423,18 @@
   #loginScreen h1{ font-size:22px; line-height:28px; font-weight:600; margin:0 0 8px; letter-spacing:-.35px; }
   #loginScreen p{ font-size:15px; line-height:20px; color:var(--label-2); margin:0 0 24px; }
   #gsiButton{ display:flex; justify-content:center; }
-  #loginSpinner{ display:none; font-size:15px; color:var(--label-2); margin-top:14px; }
+  #loginSpinner{ display:none; margin-top:18px; }
+  .loading-track{ position:relative; width:220px; height:4px; margin:0 auto;
+    border-radius:var(--r-pill); background:var(--gray-5); overflow:hidden; }
+  .loading-glow{ position:absolute; top:0; left:0; height:100%; width:36%; border-radius:var(--r-pill);
+    background:linear-gradient(90deg, transparent, var(--accent) 50%, transparent);
+    animation:barrido 1.5s ease-in-out infinite; }
+  @keyframes barrido{
+    0%{ transform:translateX(-110%); }
+    100%{ transform:translateX(390%); }
+  }
+  .loading-msg{ margin-top:12px; font-size:13px; line-height:18px; color:var(--label-2);
+    transition:opacity .3s var(--ease); min-height:18px; }
   #loginError{ display:none; font-size:15px; line-height:20px; color:var(--rojo); font-weight:600;
     margin-top:14px; background:var(--rojo-bg); border-radius:var(--r-sm); padding:12px 14px; }
   .account{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--label-2); }
@@ -445,7 +456,10 @@
     <p>GH Consultora · Gestión Ambiental<br>
        Iniciá sesión con una cuenta de Google autorizada para ver el panel.</p>
     <div id="gsiButton"></div>
-    <div id="loginSpinner">Verificando acceso…</div>
+    <div id="loginSpinner">
+      <div class="loading-track"><div class="loading-glow"></div></div>
+      <div id="loadingMsg" class="loading-msg">Verificando tu acceso…</div>
+    </div>
     <div id="loginError"></div>
   </div>
 </div>
@@ -628,15 +642,47 @@ window.onload = function(){
     { theme:'outline', size:'large', text:'signin_with', shape:'pill' });
 };
 
+// Mensajes que rotan mientras se carga todo (datos + carpetas de Drive) para
+// que la espera se sienta más corta, aunque tarde lo mismo.
+const MENSAJES_CARGA = [
+  'Verificando tu acceso…',
+  'Buscando las habilitaciones…',
+  'Sincronizando auditorías ambientales…',
+  'Ordenando las carpetas de Drive…',
+  'Optimizando el proceso…',
+  'Ya casi está…'
+];
+let cargaIntervalo = null;
+
+function iniciarCargaVisual(){
+  const spinner = document.getElementById('loginSpinner');
+  const msg = document.getElementById('loadingMsg');
+  spinner.style.display = 'block';
+  let i = 0;
+  msg.textContent = MENSAJES_CARGA[0];
+  clearInterval(cargaIntervalo);
+  cargaIntervalo = setInterval(()=>{
+    i = (i + 1) % MENSAJES_CARGA.length;
+    msg.style.opacity = 0;
+    setTimeout(()=>{ msg.textContent = MENSAJES_CARGA[i]; msg.style.opacity = 1; }, 300);
+  }, 2200);
+}
+
+function detenerCargaVisual(){
+  clearInterval(cargaIntervalo);
+  cargaIntervalo = null;
+  document.getElementById('loginSpinner').style.display = 'none';
+}
+
 function alIniciarSesion(resp){
   idToken = resp.credential;
   document.getElementById('gsiButton').style.display = 'none';
-  document.getElementById('loginSpinner').style.display = 'block';
   document.getElementById('loginError').style.display = 'none';
+  iniciarCargaVisual();
 
   llamarBackend('getData', {}).then(data=>{
-    document.getElementById('loginSpinner').style.display = 'none';
     if(!data.ok){
+      detenerCargaVisual();
       idToken = null;
       document.getElementById('gsiButton').style.display = 'block';
       const err = document.getElementById('loginError');
@@ -644,14 +690,22 @@ function alIniciarSesion(resp){
       err.style.display = 'block';
       return;
     }
-    document.getElementById('accountEmail').textContent = data.email;
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('dashboardScreen').style.display = 'block';
-    EQUIPO = data.equipo || [];
-    arrancar({ generado: data.generado, empresas: data.empresas });
-    cargarCarpetas();
+    // Las carpetas de Drive se esperan acá tambien (no solo los datos de la
+    // planilla) para que el panel ya aparezca completo, sin "No tengo la
+    // carpeta" hasta que termine un fetch en segundo plano.
+    return llamarBackend('getCarpetas', {}).then(cData=>{
+      const carpetas = cData.ok ? cData.carpetas : {};
+      data.empresas.forEach(emp=>{ emp.carpetas = carpetas[emp.empresa] || null; });
+
+      document.getElementById('accountEmail').textContent = data.email;
+      EQUIPO = data.equipo || [];
+      detenerCargaVisual();
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('dashboardScreen').style.display = 'block';
+      arrancar({ generado: data.generado, empresas: data.empresas });
+    });
   }).catch(()=>{
-    document.getElementById('loginSpinner').style.display = 'none';
+    detenerCargaVisual();
     document.getElementById('gsiButton').style.display = 'block';
     const err = document.getElementById('loginError');
     err.textContent = 'No se pudo conectar con el backend. Probá de nuevo en un momento.';
@@ -689,31 +743,15 @@ let FILTRO = null;   // 'rojo' | 'naranja' | 'amarillo' | 'verde' | 'gris' | nul
 let BUSQUEDA = '';
 
 // Vuelve a pedir habilitaciones y auditorías al backend y redibuja. Las
-// carpetas de Drive que ya estén cacheadas viajan igual, pero no se
-// recalculan acá — eso es cargarCarpetas(). Se usa desde el botón
-// "Actualizar" general y después de guardar las fechas de una renovación,
-// para que el semáforo quede al día.
+// carpetas de Drive viajan con la misma respuesta, tomadas del cache del
+// backend (ya se calcularon una vez al hacer login) — por eso esto es
+// rápido. Se usa desde el botón "Actualizar" general y después de guardar
+// las fechas de una renovación, para que el semáforo quede al día.
 function cargarDatos(){
   return llamarBackend('getData', {}).then(data=>{
     if(data.ok){
       EQUIPO = data.equipo || [];
       window.PAYLOAD = { generado: data.generado, empresas: data.empresas };
-      aplicar();
-    }
-    return data;
-  });
-}
-
-// Recorre las carpetas de Drive de las 24 empresas (accesos a Predio,
-// Transporte, Hidráulica, Auditorías). Puede tardar si el cache del backend
-// venció, así que se pide aparte y en segundo plano después del login — el
-// panel ya se ve con los datos de habilitaciones/auditorías sin esperarla.
-function cargarCarpetas(){
-  return llamarBackend('getCarpetas', {}).then(data=>{
-    if(data.ok && window.PAYLOAD){
-      window.PAYLOAD.empresas.forEach(emp=>{
-        emp.carpetas = data.carpetas[emp.empresa] || emp.carpetas || null;
-      });
       aplicar();
     }
     return data;
