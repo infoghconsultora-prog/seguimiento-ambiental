@@ -201,6 +201,9 @@
   .folder-btn:hover{ background:color-mix(in srgb,var(--accent) 22%,transparent); }
   .folder-btn:active{ transform:scale(.9); }
   .folder-btn .icon{ width:15px; height:15px; }
+  .folder-btn:disabled{ opacity:.6; cursor:default; }
+  .folder-btn.girando .icon{ animation:girar .7s linear infinite; }
+  @keyframes girar{ to{ transform:rotate(360deg); } }
 
   .company-body{ padding:0 clamp(14px,1.5vw,20px) 16px; }
 
@@ -590,6 +593,7 @@ const ICONOS = {
   equis:'<path d="m4.4 4.4 7.2 7.2M11.6 4.4l-7.2 7.2"/>',
   doc:'<path d="M4 2.6h4.6L12 6v7.4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3.6a1 1 0 0 1 1-1Z"/><path d="M8.4 2.8V6H11.7"/>',
   carpeta:'<path d="M2.4 5.1a1.3 1.3 0 0 1 1.3-1.3h2.2l1.3 1.5h5.1a1.3 1.3 0 0 1 1.3 1.3v5.2a1.3 1.3 0 0 1-1.3 1.3H3.7a1.3 1.3 0 0 1-1.3-1.3z"/>',
+  refrescar:'<path d="M3 8a5 5 0 0 1 8.5-3.5L13 6"/><path d="M13 2.5V6H9.5"/><path d="M13 8a5 5 0 0 1-8.5 3.5L3 10"/><path d="M3 13.5V10h3.5"/>',
   chevron:'<path d="m4.4 6.2 3.6 3.6 3.6-3.6"/>',
   sol:'<circle cx="8" cy="8" r="2.9"/><path d="M8 1.6v1.3M8 13.1v1.3M14.4 8h-1.3M2.9 8H1.6M12.5 3.5l-.9.9M4.4 11.6l-.9.9M12.5 12.5l-.9-.9M4.4 4.4l-.9-.9"/>',
   luna:'<path d="M13.1 9.6A5.6 5.6 0 0 1 6.4 2.9a5.6 5.6 0 1 0 6.7 6.7Z"/>',
@@ -1082,6 +1086,7 @@ function render(empresas){
         </div>
         <div class="company-summary">
           ${carpetas.carpeta ? `<a class="folder-btn" href="${escapeHtml(carpetas.carpeta)}" target="_blank" rel="noopener" title="Carpeta de la empresa en Drive" aria-label="Carpeta de la empresa en Drive">${ico('carpeta')}</a>` : ''}
+          <button type="button" class="folder-btn btn-actualizar-carpetas" title="Volver a buscar las carpetas de esta empresa" aria-label="Actualizar carpetas">${ico('refrescar')}</button>
           <span class="badge ${peor}"><span class="dot ${peor}"></span>${badgeLabel}</span>
         </div>
       </div>
@@ -1112,6 +1117,26 @@ function render(empresas){
     card.querySelector('.btn-n3').addEventListener('click', ()=>{
       card.classList.toggle('show-n3');
       card.querySelector('.btn-n3').classList.toggle('active');
+    });
+
+    // Vuelve a buscar Predio/Transporte/Hidráulica/Auditorías de esta
+    // empresa por si le crearon o renombraron carpetas en Drive.
+    const btnActualizarCarpetas = card.querySelector('.btn-actualizar-carpetas');
+    btnActualizarCarpetas.addEventListener('click', ()=>{
+      btnActualizarCarpetas.classList.add('girando');
+      btnActualizarCarpetas.disabled = true;
+      llamarBackend('actualizarCarpetas', { empresa: emp.empresa }).then(r=>{
+        if(r.ok){
+          emp.carpetas = r.carpetas;
+          aplicar();
+        } else {
+          btnActualizarCarpetas.classList.remove('girando');
+          btnActualizarCarpetas.disabled = false;
+        }
+      }).catch(()=>{
+        btnActualizarCarpetas.classList.remove('girando');
+        btnActualizarCarpetas.disabled = false;
+      });
     });
 
     // CUIT y contacto: doble clic para editar, Enter guarda, Esc cancela.
