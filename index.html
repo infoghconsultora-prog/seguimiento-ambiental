@@ -197,6 +197,16 @@
     background:color-mix(in srgb,var(--accent) 13%,transparent);
     padding:6px 12px; border-radius:var(--r-pill); }
 
+  /* Acceso directo a una carpeta de Drive: siempre icono solo, nunca texto. */
+  .folder-btn{ display:inline-flex; align-items:center; justify-content:center;
+    width:32px; height:32px; flex:0 0 auto; border:none; border-radius:var(--r-pill);
+    cursor:pointer; text-decoration:none; color:var(--accent-ink);
+    background:color-mix(in srgb,var(--accent) 13%,transparent);
+    transition:transform .15s var(--ease-snappy), background .15s var(--ease); }
+  .folder-btn:hover{ background:color-mix(in srgb,var(--accent) 22%,transparent); }
+  .folder-btn:active{ transform:scale(.9); }
+  .folder-btn .icon{ width:15px; height:15px; }
+
   .company-body{ padding:0 clamp(14px,1.5vw,20px) 16px; }
 
   /* Predio | Transporte | Hidráulica */
@@ -209,6 +219,8 @@
   .org-label.transporte::before{ background:var(--naranja); }
   .org-label.hidraulica::before{ background:var(--azul); }
   .org-label .cant{ color:var(--label-3); font-weight:400; }
+  .org-label .folder-btn{ width:22px; height:22px; }
+  .org-label .folder-btn .icon{ width:12px; height:12px; }
 
   .tiles{ display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:12px; }
   .tile{ background:var(--surface-2); border-radius:var(--r-md); padding:14px 16px; }
@@ -306,6 +318,9 @@
     transition:transform .15s var(--ease-snappy); }
   .auditoria button:hover{ background:rgba(255,255,255,.32); }
   .auditoria button:active{ transform:scale(.96); }
+  .aud-acciones{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+  .auditoria .folder-btn{ background:rgba(255,255,255,.22); color:inherit; }
+  .auditoria .folder-btn:hover{ background:rgba(255,255,255,.32); }
   .auditoria.verde{ background:var(--verde); color:var(--on-verde); }
   .auditoria.amarillo{ background:var(--amarillo); color:var(--on-amarillo); }
   .auditoria.naranja{ background:var(--naranja); color:var(--on-naranja); }
@@ -967,13 +982,17 @@ function tileHtml(it){
   </div>`;
 }
 
-function auditoriaHtml(a){
+function auditoriaHtml(a, carpetas){
   const estado = a.estado;
   const fecha = a.ultima ? fmtFecha(a.ultima) : 'Sin registrar';
   const dias = (a.dias === null || a.dias === undefined) ? '' :
     `<span class="dias">hace ${a.dias} días · ${AUD_LABEL[estado]}</span>`;
   const frec = `<span class="frec">· ${a.frecuencia}${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
   const nota = a.nota ? `<span class="nota">${escapeHtml(a.nota)}</span>` : '';
+  const btnPredio = carpetas && carpetas.predio
+    ? `<a class="folder-btn" href="${escapeHtml(carpetas.predio)}" target="_blank" rel="noopener" title="Carpeta Predio" aria-label="Carpeta Predio">${ico('carpeta')}</a>` : '';
+  const btnAuditoria = carpetas && carpetas.auditoria
+    ? `<a class="folder-btn" href="${escapeHtml(carpetas.auditoria)}" target="_blank" rel="noopener" title="Carpeta de auditorías ambientales" aria-label="Carpeta de auditorías ambientales">${ico('carpeta')}</a>` : '';
   return `
     <div class="auditoria ${estado}">
       <div class="aud-main">
@@ -983,8 +1002,12 @@ function auditoriaHtml(a){
           ${dias}
           ${frec}
         </div>
-        <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
-        <input type="file" class="file-input" hidden accept=".pdf,.doc,.docx">
+        <div class="aud-acciones">
+          ${btnPredio}
+          ${btnAuditoria}
+          <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
+          <input type="file" class="file-input" hidden accept=".pdf,.doc,.docx">
+        </div>
       </div>
       ${nota}
     </div>`;
@@ -1021,19 +1044,22 @@ function render(empresas){
     }
     const n2 = emp.items.filter(i=>i.nivel===2);
     const {peor, hayDato} = peorEstado(n1);
+    const carpetas = emp.carpetas || {};
 
     // Tres columnas: Ambiente se parte en Predio y Transporte; Hidraulica aparte.
     const cols = [
-      ['Ambiente · Predio',     'ambiente',   n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='PREDIO')],
-      ['Ambiente · Transporte', 'transporte', n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='TRANSPORTE')],
-      ['Hidráulica',            'hidraulica', n1.filter(i=>i.organismo_grupo==='HIDRÁULICA')],
+      ['Ambiente · Predio',     'ambiente',   n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='PREDIO'), carpetas.predio],
+      ['Ambiente · Transporte', 'transporte', n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='TRANSPORTE'), carpetas.transporte],
+      ['Hidráulica',            'hidraulica', n1.filter(i=>i.organismo_grupo==='HIDRÁULICA'), carpetas.hidraulica],
     ].filter(([,,items])=>items.length);
 
     const gruposHtml = cols.length
       ? `<div class="organismos">
-           ${cols.map(([label,cls,items])=>`
+           ${cols.map(([label,cls,items,folderUrl])=>`
              <div class="org-col" style="flex-grow:${Math.min(items.length,3)}">
-               <div class="org-label ${cls}">${label} <span class="cant">(${items.length})</span></div>
+               <div class="org-label ${cls}">${label} <span class="cant">(${items.length})</span>
+                 ${folderUrl ? `<a class="folder-btn" href="${escapeHtml(folderUrl)}" target="_blank" rel="noopener" title="Carpeta en Drive" aria-label="Carpeta en Drive">${ico('carpeta')}</a>` : ''}
+               </div>
                <div class="tiles">${items.map(tileHtml).join('')}</div>
              </div>`).join('')}
          </div>`
@@ -1061,6 +1087,7 @@ function render(empresas){
         </div>
         <div class="company-summary">
           ${emp.ficha_url ? `<a class="ficha-link" href="${escapeHtml(emp.ficha_url)}" target="_blank" rel="noopener">${ico('carpeta')}Ficha de la empresa</a>` : ''}
+          ${carpetas.carpeta ? `<a class="folder-btn" href="${escapeHtml(carpetas.carpeta)}" target="_blank" rel="noopener" title="Carpeta de la empresa en Drive" aria-label="Carpeta de la empresa en Drive">${ico('carpeta')}</a>` : ''}
           <span class="badge ${peor}"><span class="dot ${peor}"></span>${badgeLabel}</span>
         </div>
       </div>
@@ -1081,7 +1108,7 @@ function render(empresas){
             <div class="pista">Enter para guardar · Esc para cancelar</div></div>
         </div>
       </div>
-      ${emp.auditoria ? auditoriaHtml(emp.auditoria) : ''}
+      ${emp.auditoria ? auditoriaHtml(emp.auditoria, carpetas) : ''}
     `;
 
     card.querySelector('.btn-n2').addEventListener('click', ()=>{
