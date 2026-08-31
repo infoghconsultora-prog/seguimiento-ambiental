@@ -407,6 +407,15 @@
     opacity:0; transition:opacity .2s var(--ease); }
   #copiaOk.on{ opacity:1; }
   #mailPrev{ background:var(--gray-6); padding:16px; border-radius:var(--r-md); margin-top:12px; }
+  .mail-acciones{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .mail-acciones button{ border:none; background:var(--accent); color:#fff; cursor:pointer;
+    border-radius:var(--r-pill); padding:9px 18px; font-size:15px; font-weight:600;
+    display:inline-flex; align-items:center; gap:7px;
+    transition:transform .15s var(--ease-snappy); }
+  .mail-acciones button:active{ transform:scale(.96); }
+  .mail-acciones button:disabled{ opacity:.5; cursor:default; }
+  .mail-acciones #mailEstado{ font-size:13px; color:var(--label-2); }
+  .mail-acciones #mailEstado.ok{ color:var(--accent-ink); font-weight:600; }
 
   /* en pantallas chicas se comporta como bottom sheet */
   @media (max-width:560px){
@@ -955,10 +964,39 @@ function verMail(empresa, it, tipo){
   document.getElementById('modalCard').classList.add('ancho');
   document.getElementById('modalTitulo').textContent =
     tipo === 'asignacion' ? 'Mail: definir responsable' : 'Mail: solicitud de renovación';
-  document.getElementById('modalLista').innerHTML =
-    `<div id="mailPrev">${tipo === 'asignacion' ? mailAsignacion(empresa, it) : mailRenovacion(empresa, it)}</div>`;
+
+  // Antes esto era solo una vista previa y no había forma de mandarlo.
+  document.getElementById('modalLista').innerHTML = `
+    <div class="mail-acciones">
+      <button type="button" id="btnEnviarMail">${ico('sobre')} Enviar ahora</button>
+      <span id="mailEstado"></span>
+    </div>
+    <div id="mailPrev">${tipo === 'asignacion' ? mailAsignacion(empresa, it) : mailRenovacion(empresa, it)}</div>`;
   document.getElementById('modalPie').style.display = 'none';
   overlay.classList.add('on');
+
+  const btn = document.getElementById('btnEnviarMail');
+  const estado = document.getElementById('mailEstado');
+  btn.addEventListener('click', ()=>{
+    btn.disabled = true;
+    estado.textContent = 'Enviando…';
+    llamarBackend('mailRenovacion', {
+      tipo,
+      item: Object.assign({}, it, { empresa }),
+      urlPanel: location.href.split('?')[0]
+    }).then(r=>{
+      if(r.ok){
+        estado.textContent = 'Enviado a ' + (r.enviadoA || '').replace(/,/g, ', ');
+        estado.classList.add('ok');
+      } else {
+        btn.disabled = false;
+        estado.textContent = 'No se pudo enviar: ' + (r.detalle || r.error || '');
+      }
+    }).catch(()=>{
+      btn.disabled = false;
+      estado.textContent = 'No se pudo enviar. Probá de nuevo.';
+    });
+  });
 }
 
 // ---------- auditorias pendientes ----------
