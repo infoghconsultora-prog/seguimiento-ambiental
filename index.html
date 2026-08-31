@@ -254,7 +254,8 @@
   .hab-nueva > .linea{ display:flex; align-items:center; gap:7px; }
   .fechas-renovacion{ margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:400; }
   .fechas-renovacion label{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--label-2); }
-  .fechas-renovacion input[type=date]{ font-family:inherit; font-size:12.5px; padding:5px 7px;
+  .fechas-renovacion input[type=date], .fechas-renovacion select{
+    font-family:inherit; font-size:12.5px; padding:5px 7px;
     border-radius:var(--r-sm); border:none; background:var(--surface); color:var(--label); }
   .fechas-renovacion button{ border:none; background:var(--accent); color:#fff; font-weight:600;
     font-size:12.5px; padding:6px 12px; border-radius:var(--r-pill); cursor:pointer; }
@@ -544,13 +545,50 @@ const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k
 
 let idToken = null;
 
-/* Los archivos no se suben desde el panel: el botón abre la carpeta de Drive
-   en una pestaña nueva y el archivo se arrastra ahí, como siempre. Así el
-   panel no necesita permiso para tocar Drive (que Google pide aparte del
-   login), y no depende de que los nombres de carpeta estén estandarizados.
-   Lo que sí queda registrado acá es la fecha de vencimiento. */
+/* El archivo lo escribe en Drive el backend, que corre con la cuenta de la
+   consultora: por eso subir no le pide ningún permiso a quien usa el panel.
+   (Lo que antes pedía permiso era el selector de carpetas de Google, que ya
+   no usamos: ahora el destino se elige de una lista corta.) */
 function abrirEnDrive(url){
   window.open(url, '_blank', 'noopener');
+}
+
+// Las URLs de carpeta de Drive son .../folders/<id>. Necesitamos el id para
+// decirle al backend dónde guardar.
+function idDeCarpeta(url){
+  const m = String(url || '').match(/\/folders\/([a-zA-Z0-9_-]{20,})/);
+  return m ? m[1] : null;
+}
+
+// Carpetas de una empresa donde tiene sentido guardar, en el orden en que se
+// ofrecen. Solo aparecen las que esa empresa realmente tiene.
+function carpetasDestino(carpetas){
+  if(!carpetas) return [];
+  return [
+    ['Carpeta de la empresa',   carpetas.carpetaId],
+    ['Predio',                  idDeCarpeta(carpetas.predio)],
+    ['Transporte',              idDeCarpeta(carpetas.transporte)],
+    ['Hidráulica',              idDeCarpeta(carpetas.hidraulica)],
+    ['Auditorías ambientales',  idDeCarpeta(carpetas.auditoria)]
+  ].filter(o => o[1]);
+}
+
+const MAX_SUBIDA_MB = 20;
+
+// Manda el archivo al backend en base64.
+function subirAlBackend(file, extra){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>{
+      llamarBackend('subirArchivo', Object.assign({
+        nombre: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        base64: r.result.split(',')[1]
+      }, extra)).then(resolve).catch(reject);
+    };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 }
 
 function llamarBackend(action, extra){
@@ -1087,7 +1125,8 @@ function tileHtml(it){
     </div>
     <div class="exp-row">
       <span class="tile-exp">${it.expediente ? 'Exp. ' + escapeHtml(it.expediente) : 'Sin expediente'}</span>
-      <button type="button" class="btn-hab" title="Renovada: abrir la carpeta en Drive y cargar el vencimiento">${ico('arriba')}</button>
+      <button type="button" class="btn-hab" title="Subir la habilitación renovada">${ico('arriba')}</button>
+      <input type="file" class="hab-input" hidden accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
     </div>
     ${vencLine}
     ${resLink}
@@ -1121,7 +1160,8 @@ function auditoriaHtml(a, carpetas){
         <div class="aud-acciones">
           ${btnPredio}
           ${btnAuditoria}
-          <button type="button" class="btn-subir">${ico('check')} Auditoría hecha hoy</button>
+          <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
+          <input type="file" class="file-input" hidden accept=".pdf,.doc,.docx">
         </div>
       </div>
       ${nota}
@@ -1317,11 +1357,18 @@ function render(empresas){
       });
     });
 
-    // Habilitación renovada: abre la carpeta de la empresa en Drive (ahí se
-    // arrastra el archivo a mano) y pide la fecha de vencimiento, que es lo
-    // que el panel necesita para recalcular el semáforo.
+    // Habilitación renovada: se elige el archivo, se elige a qué carpeta de
+    // esa empresa va, lo sube el backend, y después se carga el vencimiento
+    // (que es lo que el panel necesita para recalcular el semáforo).
     card.querySelectorAll('.exp-row').forEach(fila=>{
-      fila.querySelector('.btn-hab').addEventListener('click', ()=>{
+      const input = fila.querySelector('.hab-input');
+      fila.querySelector('.btn-hab').addEventListener('click', ()=> input.click());
+
+      input.addEventListener('change', ()=>{
+        if(!input.files.length) return;
+        const file = input.files[0];
+        input.value = '';   // permite volver a elegir el mismo archivo si hay que reintentar
+
         const tile = fila.closest('.tile');
         const idx = [...card.querySelectorAll('.tile')].indexOf(tile);
         const it = emp.items[idx];
@@ -1333,35 +1380,73 @@ function render(empresas){
           fila.insertAdjacentElement('afterend', ok);
         }
 
-        // El link de la resolución apunta al PDF dentro de la carpeta del
-        // expediente, así que abre más cerca del lugar exacto que la raíz.
-        const destino = it.resolucion_url || carpetas.carpeta;
-        if(destino) abrirEnDrive(destino);
+        // Formulario de fechas, que se muestra una vez subido el archivo.
+        function pedirFechas(lineaHtml){
+          ok.innerHTML = lineaHtml + `
+            <div class="fechas-renovacion">
+              <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
+              <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
+              <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
+              <span class="fechas-guardado">Guardado</span>
+            </div>`;
+          const btnGuardar = ok.querySelector('.btn-guardar-fechas');
+          btnGuardar.addEventListener('click', ()=>{
+            const otorgada = ok.querySelector('.fecha-otorgada').value;
+            const vencimiento = ok.querySelector('.fecha-vencimiento').value;
+            if(!vencimiento) return;
+            btnGuardar.disabled = true;
+            llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento }).then(res=>{
+              btnGuardar.disabled = false;
+              if(res.ok){
+                ok.querySelector('.fechas-guardado').classList.add('on');
+                cargarDatos();
+              }
+            }).catch(()=>{ btnGuardar.disabled = false; });
+          });
+        }
+
+        if(file.size > MAX_SUBIDA_MB * 1024 * 1024){
+          ok.innerHTML = `<div class="linea">El archivo pesa más de ${MAX_SUBIDA_MB} MB.
+            Subilo directo en Drive${carpetas.carpeta
+              ? ' — <a class="doc-link" href="' + escapeHtml(carpetas.carpeta) + '" target="_blank" rel="noopener">abrir carpeta</a>'
+              : ''}.</div>`;
+          return;
+        }
+
+        const destinos = carpetasDestino(carpetas);
+        if(!destinos.length){
+          ok.innerHTML = '<div class="linea">No tengo la carpeta de esta empresa en Drive.</div>';
+          return;
+        }
 
         ok.innerHTML = `
-          <div class="linea">${destino
-            ? ico('carpeta') + ' Drive abierto en otra pestaña — soltá ahí el archivo'
-            : 'No tengo la carpeta de esta empresa en Drive'}</div>
+          <div class="linea">${escapeHtml(file.name)}</div>
           <div class="fechas-renovacion">
-            <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
-            <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
-            <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
-            <span class="fechas-guardado">Guardado</span>
+            <label>Guardar en
+              <select class="carpeta-destino">
+                ${destinos.map(([n,id])=>`<option value="${escapeHtml(id)}">${escapeHtml(n)}</option>`).join('')}
+              </select>
+            </label>
+            <button type="button" class="btn-confirmar-subida">Subir</button>
           </div>`;
 
-        const btnGuardar = ok.querySelector('.btn-guardar-fechas');
-        btnGuardar.addEventListener('click', ()=>{
-          const otorgada = ok.querySelector('.fecha-otorgada').value;
-          const vencimiento = ok.querySelector('.fecha-vencimiento').value;
-          if(!vencimiento) return;
-          btnGuardar.disabled = true;
-          llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento }).then(res=>{
-            btnGuardar.disabled = false;
-            if(res.ok){
-              ok.querySelector('.fechas-guardado').classList.add('on');
-              cargarDatos();
+        const btnSubir = ok.querySelector('.btn-confirmar-subida');
+        btnSubir.addEventListener('click', ()=>{
+          const carpetaId = ok.querySelector('.carpeta-destino').value;
+          btnSubir.disabled = true;
+          ok.querySelector('.linea').textContent = 'Subiendo ' + file.name + '…';
+          subirAlBackend(file, { carpetaId, empresa: emp.empresa }).then(r=>{
+            if(!r.ok){
+              ok.innerHTML = '<div class="linea">No se pudo subir: ' +
+                escapeHtml(r.detalle || r.error) + '</div>';
+              return;
             }
-          }).catch(()=>{ btnGuardar.disabled = false; });
+            pedirFechas('<div class="linea">' + ico('check') + ' Guardado en ' +
+              escapeHtml(r.carpeta) + ' — <a class="doc-link" href="' + escapeHtml(r.url) +
+              '" target="_blank" rel="noopener">ver</a></div>');
+          }).catch(()=>{
+            ok.innerHTML = '<div class="linea">No se pudo subir. Probá de nuevo.</div>';
+          });
         });
       });
     });
@@ -1395,21 +1480,50 @@ function render(empresas){
       });
     });
 
-    // Auditoría hecha: el informe se sube a mano en Drive (el botón de carpeta
-    // de al lado lo abre); acá solo se registra la fecha y la franja se pone
-    // en verde.
+    // Informe de auditoría: acá el destino es uno solo (la carpeta de
+    // auditorías de la empresa), así que no hay lista que elegir. Subirlo
+    // también registra la fecha y pone la franja en verde.
     const strip = card.querySelector('.auditoria');
     if(strip){
-      const btnHecha = strip.querySelector('.btn-subir');
-      btnHecha.addEventListener('click', ()=>{
-        btnHecha.disabled = true;
-        llamarBackend('setAuditoria', { fila: emp.auditoria.fila })
-          .then(()=> cargarDatos())
-          .catch(()=>{ btnHecha.disabled = false; });
-        strip.className = 'auditoria verde';
-        strip.querySelector('.fecha').textContent = fmtFecha(new Date().toISOString().slice(0,10));
-        const dias = strip.querySelector('.dias');
-        if(dias) dias.textContent = 'hace 0 días · Al día';
+      const input = strip.querySelector('.file-input');
+      const btnSubir = strip.querySelector('.btn-subir');
+      btnSubir.addEventListener('click', ()=> input.click());
+
+      input.addEventListener('change', ()=>{
+        if(!input.files.length) return;
+        const file = input.files[0];
+        input.value = '';
+
+        const carpetaId = idDeCarpeta(carpetas.auditoria) || carpetas.carpetaId;
+        const nota = strip.querySelector('.nota');
+        function aviso(txt){
+          if(nota) nota.textContent = txt;
+          else strip.insertAdjacentHTML('beforeend', `<span class="nota">${escapeHtml(txt)}</span>`);
+        }
+
+        if(!carpetaId){ aviso('No tengo la carpeta de esta empresa en Drive'); return; }
+        if(file.size > MAX_SUBIDA_MB * 1024 * 1024){
+          aviso(`El informe pesa más de ${MAX_SUBIDA_MB} MB, subilo directo en Drive`);
+          return;
+        }
+
+        btnSubir.disabled = true;
+        aviso('Subiendo ' + file.name + '…');
+        subirAlBackend(file, { carpetaId, empresa: emp.empresa }).then(r=>{
+          btnSubir.disabled = false;
+          if(!r.ok){ aviso('No se pudo subir: ' + (r.detalle || r.error)); return; }
+          aviso(file.name);
+          // La subida vale como auditoría hecha: se registra la fecha de hoy.
+          llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: file.name })
+            .then(()=> cargarDatos()).catch(()=>{});
+          strip.className = 'auditoria verde';
+          strip.querySelector('.fecha').textContent = fmtFecha(new Date().toISOString().slice(0,10));
+          const dias = strip.querySelector('.dias');
+          if(dias) dias.textContent = 'hace 0 días · Al día';
+        }).catch(()=>{
+          btnSubir.disabled = false;
+          aviso('No se pudo subir. Probá de nuevo.');
+        });
       });
     }
 
