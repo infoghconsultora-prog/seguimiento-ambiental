@@ -234,6 +234,10 @@
     justify-content:center; cursor:pointer; font-size:13px; transition:transform .15s var(--ease-snappy); }
   .btn-hab:hover{ background:color-mix(in srgb,var(--accent) 18%,transparent); color:var(--accent-ink); }
   .btn-hab:active{ transform:scale(.9); }
+  .btn-hab:disabled{ opacity:.6; cursor:default; }
+  .btn-hab.girando .icon{ animation:girar .7s linear infinite; }
+  /* Deshacer: mismo botón circular, en naranja para que no se confunda con subir. */
+  .btn-deshacer:hover{ background:var(--naranja-bg); color:var(--naranja); }
   .tile-venc{ font-size:13px; }
   .doc-link{ display:inline-flex; align-items:center; gap:6px; margin-top:8px;
     font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink); text-decoration:none; }
@@ -701,6 +705,7 @@ const ICONOS = {
   doc:'<path d="M4 2.6h4.6L12 6v7.4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3.6a1 1 0 0 1 1-1Z"/><path d="M8.4 2.8V6H11.7"/>',
   carpeta:'<path d="M2.4 5.1a1.3 1.3 0 0 1 1.3-1.3h2.2l1.3 1.5h5.1a1.3 1.3 0 0 1 1.3 1.3v5.2a1.3 1.3 0 0 1-1.3 1.3H3.7a1.3 1.3 0 0 1-1.3-1.3z"/>',
   refrescar:'<path d="M3 8a5 5 0 0 1 8.5-3.5L13 6"/><path d="M13 2.5V6H9.5"/><path d="M13 8a5 5 0 0 1-8.5 3.5L3 10"/><path d="M3 13.5V10h3.5"/>',
+  deshacer:'<path d="M3.4 7.6a5.2 5.2 0 1 1 1.3 4.2"/><path d="M2.6 3.9v3.9h3.9"/>',
   chevron:'<path d="m4.4 6.2 3.6 3.6 3.6-3.6"/>',
   sol:'<circle cx="8" cy="8" r="2.9"/><path d="M8 1.6v1.3M8 13.1v1.3M14.4 8h-1.3M2.9 8H1.6M12.5 3.5l-.9.9M4.4 11.6l-.9.9M12.5 12.5l-.9-.9M4.4 4.4l-.9-.9"/>',
   luna:'<path d="M13.1 9.6A5.6 5.6 0 0 1 6.4 2.9a5.6 5.6 0 1 0 6.7 6.7Z"/>',
@@ -1138,6 +1143,9 @@ function tileHtml(it){
     <div class="exp-row">
       <span class="tile-exp">${it.expediente ? 'Exp. ' + escapeHtml(it.expediente) : 'Sin expediente'}</span>
       <button type="button" class="btn-hab" title="Subir la habilitación renovada">${ico('arriba')}</button>
+      ${it.ultima_subida ? `<button type="button" class="btn-hab btn-deshacer"
+         title="Deshacer la subida de «${escapeHtml(it.ultima_subida.nombre)}» — el archivo va a la papelera de Drive"
+         aria-label="Deshacer última subida">${ico('deshacer')}</button>` : ''}
       <input type="file" class="hab-input" hidden accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
     </div>
     ${vencLine}
@@ -1173,6 +1181,9 @@ function auditoriaHtml(a, carpetas){
           ${btnPredio}
           ${btnAuditoria}
           <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
+          ${a.ultima_subida ? `<button type="button" class="folder-btn btn-deshacer-aud"
+             title="Deshacer la subida de «${escapeHtml(a.ultima_subida.nombre)}» y volver a la fecha anterior"
+             aria-label="Deshacer última subida">${ico('deshacer')}</button>` : ''}
           <input type="file" class="file-input" hidden accept=".pdf,.doc,.docx">
         </div>
       </div>
@@ -1375,6 +1386,26 @@ function render(empresas){
       const input = fila.querySelector('.hab-input');
       fila.querySelector('.btn-hab').addEventListener('click', ()=> input.click());
 
+      // Deshacer: manda solo la fila, nunca el id del archivo. El backend sabe
+      // cuál fue la última subida de esa fila y la manda a la papelera.
+      const btnDeshacer = fila.querySelector('.btn-deshacer');
+      if(btnDeshacer){
+        btnDeshacer.addEventListener('click', ()=>{
+          const it = itemDeTile(emp, fila.closest('.tile'));
+          if(!it) return;
+          btnDeshacer.disabled = true;
+          btnDeshacer.classList.add('girando');
+          llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila }).then(r=>{
+            if(r.ok) return cargarDatos();
+            btnDeshacer.disabled = false;
+            btnDeshacer.classList.remove('girando');
+          }).catch(()=>{
+            btnDeshacer.disabled = false;
+            btnDeshacer.classList.remove('girando');
+          });
+        });
+      }
+
       input.addEventListener('change', ()=>{
         if(!input.files.length) return;
         const file = input.files[0];
@@ -1446,7 +1477,7 @@ function render(empresas){
           const carpetaId = ok.querySelector('.carpeta-destino').value;
           btnSubir.disabled = true;
           ok.querySelector('.linea').textContent = 'Subiendo ' + file.name + '…';
-          subirAlBackend(file, { carpetaId, empresa: emp.empresa }).then(r=>{
+          subirAlBackend(file, { carpetaId, empresa: emp.empresa, tipo:'hab', fila: it.fila }).then(r=>{
             if(!r.ok){
               ok.innerHTML = '<div class="linea">No se pudo subir: ' +
                 escapeHtml(r.detalle || r.error) + '</div>';
@@ -1454,7 +1485,29 @@ function render(empresas){
             }
             pedirFechas('<div class="linea">' + ico('check') + ' Guardado en ' +
               escapeHtml(r.carpeta) + ' — <a class="doc-link" href="' + escapeHtml(r.url) +
-              '" target="_blank" rel="noopener">ver</a></div>');
+              '" target="_blank" rel="noopener">ver</a>' +
+              '<button type="button" class="btn-hab btn-deshacer btn-deshacer-recien" ' +
+              'title="Deshacer esta subida — el archivo va a la papelera de Drive" ' +
+              'aria-label="Deshacer esta subida">' + ico('deshacer') + '</button></div>');
+
+            // Deshacer sin salir del paso: la tarjeta todavía no se redibujó,
+            // así que el botón de la fila de arriba aún no existe.
+            const btnRecien = ok.querySelector('.btn-deshacer-recien');
+            btnRecien.addEventListener('click', ()=>{
+              btnRecien.disabled = true;
+              btnRecien.classList.add('girando');
+              llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila }).then(res=>{
+                if(res.ok){
+                  ok.innerHTML = '<div class="linea">Subida deshecha. El archivo quedó en la papelera de Drive.</div>';
+                  return;
+                }
+                btnRecien.disabled = false;
+                btnRecien.classList.remove('girando');
+              }).catch(()=>{
+                btnRecien.disabled = false;
+                btnRecien.classList.remove('girando');
+              });
+            });
           }).catch(()=>{
             ok.innerHTML = '<div class="linea">No se pudo subir. Probá de nuevo.</div>';
           });
@@ -1520,7 +1573,8 @@ function render(empresas){
 
         btnSubir.disabled = true;
         aviso('Subiendo ' + file.name + '…');
-        subirAlBackend(file, { carpetaId, empresa: emp.empresa }).then(r=>{
+        subirAlBackend(file, { carpetaId, empresa: emp.empresa,
+                               tipo:'aud', fila: emp.auditoria.fila }).then(r=>{
           btnSubir.disabled = false;
           if(!r.ok){ aviso('No se pudo subir: ' + (r.detalle || r.error)); return; }
           aviso(file.name);
@@ -1536,6 +1590,24 @@ function render(empresas){
           aviso('No se pudo subir. Probá de nuevo.');
         });
       });
+
+      // Deshacer la subida del informe: manda el archivo a la papelera y
+      // devuelve la fecha de auditoría que estaba antes.
+      const btnDeshacerAud = strip.querySelector('.btn-deshacer-aud');
+      if(btnDeshacerAud){
+        btnDeshacerAud.addEventListener('click', ()=>{
+          btnDeshacerAud.disabled = true;
+          btnDeshacerAud.classList.add('girando');
+          llamarBackend('deshacerSubida', { tipo:'aud', fila: emp.auditoria.fila }).then(r=>{
+            if(r.ok) return cargarDatos();
+            btnDeshacerAud.disabled = false;
+            btnDeshacerAud.classList.remove('girando');
+          }).catch(()=>{
+            btnDeshacerAud.disabled = false;
+            btnDeshacerAud.classList.remove('girando');
+          });
+        });
+      }
     }
 
     cont.appendChild(card);
