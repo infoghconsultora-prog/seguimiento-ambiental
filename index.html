@@ -529,11 +529,10 @@
   </div>
 </div>
 
-<footer>Mockup generado a partir de la copia de seguridad del 24/08/2026 · Solo para revisar la estructura visual. El botón de subir informe simula el comportamiento, no envía nada.</footer>
+<footer>GH Consultora · Los datos salen de las planillas de Seguimiento y control y de Visitas a empresas, y toda edición que hagas acá se guarda en ellas. Los archivos se suben directo en Drive.</footer>
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js"></script>
 <script>
 /* ---------------------------------------------------------------
    Shell publico: no contiene ningun dato de las empresas.
@@ -542,104 +541,16 @@
    --------------------------------------------------------------- */
 const CLIENT_ID  = '397447072902-nhbl4at1hhd41igam0hbq7p2kc0gt8up.apps.googleusercontent.com';
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k2o2gI_oDSOlDrkQs7PbMDNRvDEUR6ajoAhABSNVuCmHi9PpDNw/exec';
-// API key restringida a "Google Picker API", del mismo proyecto de Cloud
-// (gh-vencimientos) que el CLIENT_ID de arriba. Ver PROGRESS.md del backend.
-const PICKER_API_KEY = 'AIzaSyD9Ebn4JAdIrPTv3yEk9hFiqaWCzNxeI0U';
 
 let idToken = null;
 
-/* ---------- selector de carpeta de Drive para elegir donde guardar ---------- */
-// Mientras no estandaricemos nombres de carpeta/archivo, quien sube el
-// archivo elige a mano donde guardarlo dentro de la carpeta ya estandarizada
-// de la empresa (o crea una nueva ahí). Para eso el picker necesita, además
-// del idToken de login, un token de acceso con permiso de Drive.
-let driveAccessToken = null;
-let driveTokenClient = null;
-let pickerCargado = false;
-let emailSesion = null;   // se completa al iniciar sesión, para el "hint" de abajo
-
-function cargarPicker(){
-  if(pickerCargado) return Promise.resolve();
-  return new Promise(resolve=>{
-    gapi.load('picker', ()=>{ pickerCargado = true; resolve(); });
-  });
-}
-
-/* El login (idToken) dice QUIÉN sos; para tocar Drive hace falta además un
-   token de acceso. Son dos cosas distintas en Google y no se pueden mezclar.
-   Lo que sí se puede es que el permiso de Drive se pida UNA sola vez:
-     · prompt:'' → Google solo pregunta la primera vez que se pide el permiso;
-       después lo renueva solo, sin ventana ni interrupción.
-     · hint → ya sabemos con qué cuenta entró, así que no hace falta que
-       vuelva a elegirla de una lista. */
-function pedirAccessToken(){
-  return new Promise((resolve, reject)=>{
-    if(driveAccessToken){ resolve(driveAccessToken); return; }
-    if(!driveTokenClient){
-      driveTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/drive.file',
-        prompt: '',
-        hint: emailSesion || '',
-        callback: ()=>{}
-      });
-    }
-    // El callback se reasigna en cada pedido: si quedara el de la primera vez,
-    // al vencer el token (~1 h) el siguiente pedido nunca se resolvería.
-    driveTokenClient.callback = resp=>{
-      if(resp.error){ reject(resp); return; }
-      driveAccessToken = resp.access_token;
-      setTimeout(()=>{ driveAccessToken = null; }, (resp.expires_in - 60) * 1000);
-      resolve(driveAccessToken);
-    };
-    driveTokenClient.requestAccessToken();
-  });
-}
-
-// Abre el picker de Drive ya adentro de la carpeta de la empresa (folderId),
-// con la creación de carpetas nuevas habilitada. Devuelve {id, nombre} de lo
-// elegido, o null si se cancela.
-function elegirCarpeta(folderId){
-  return cargarPicker().then(()=> pedirAccessToken()).then(token=>{
-    return new Promise(resolve=>{
-      const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-        .setParent(folderId)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true)
-        .setMimeTypes('application/vnd.google-apps.folder');
-      const picker = new google.picker.PickerBuilder()
-        .addView(view)
-        .setOAuthToken(token)
-        .setDeveloperKey(PICKER_API_KEY)
-        .setTitle('Elegí (o creá) la carpeta donde guardar el archivo')
-        .setCallback(data=>{
-          if(data.action === google.picker.Action.PICKED){
-            resolve({ id: data.docs[0].id, nombre: data.docs[0].name });
-          } else if(data.action === google.picker.Action.CANCEL){
-            resolve(null);
-          }
-        })
-        .build();
-      picker.setVisible(true);
-    });
-  });
-}
-
-// Manda un archivo al backend en base64. El destino lo resuelve el backend
-// a partir del link de la resolucion (la carpeta del expediente).
-function subirAlBackend(file, extra){
-  return new Promise((resolve, reject)=>{
-    const r = new FileReader();
-    r.onload = ()=>{
-      llamarBackend('subirArchivo', Object.assign({
-        nombre: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        base64: r.result.split(',')[1]
-      }, extra)).then(resolve).catch(reject);
-    };
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
+/* Los archivos no se suben desde el panel: el botón abre la carpeta de Drive
+   en una pestaña nueva y el archivo se arrastra ahí, como siempre. Así el
+   panel no necesita permiso para tocar Drive (que Google pide aparte del
+   login), y no depende de que los nombres de carpeta estén estandarizados.
+   Lo que sí queda registrado acá es la fecha de vencimiento. */
+function abrirEnDrive(url){
+  window.open(url, '_blank', 'noopener');
 }
 
 function llamarBackend(action, extra){
@@ -720,7 +631,6 @@ function intentarLogin(primerIntento){
       data.empresas.forEach(emp=>{ emp.carpetas = carpetas[emp.empresa] || null; });
 
       document.getElementById('accountEmail').textContent = data.email;
-      emailSesion = data.email;
       EQUIPO = data.equipo || [];
       detenerCargaVisual();
       document.getElementById('loginScreen').style.display = 'none';
@@ -738,7 +648,7 @@ function intentarLogin(primerIntento){
   });
 }
 
-const HOY = new Date(2026, 7, 24); // 24/08/2026
+const HOY = new Date();   // el backend calcula los semáforos con su propia fecha
 
 // Iconos dibujados a mano en el mismo lenguaje que SF Symbols (trazo 1.7,
 // extremos redondeados). No se usa la fuente de Apple: no es licenciable para web.
@@ -1177,8 +1087,7 @@ function tileHtml(it){
     </div>
     <div class="exp-row">
       <span class="tile-exp">${it.expediente ? 'Exp. ' + escapeHtml(it.expediente) : 'Sin expediente'}</span>
-      <button type="button" class="btn-hab" title="Subir nueva habilitación">${ico('arriba')}</button>
-      <input type="file" class="hab-input" hidden accept=".pdf,.doc,.docx,.jpg,.png">
+      <button type="button" class="btn-hab" title="Renovada: abrir la carpeta en Drive y cargar el vencimiento">${ico('arriba')}</button>
     </div>
     ${vencLine}
     ${resLink}
@@ -1212,8 +1121,7 @@ function auditoriaHtml(a, carpetas){
         <div class="aud-acciones">
           ${btnPredio}
           ${btnAuditoria}
-          <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
-          <input type="file" class="file-input" hidden accept=".pdf,.doc,.docx">
+          <button type="button" class="btn-subir">${ico('check')} Auditoría hecha hoy</button>
         </div>
       </div>
       ${nota}
@@ -1409,21 +1317,15 @@ function render(empresas){
       });
     });
 
-    // Subida de una nueva habilitacion, al lado de cada expediente. Hasta que
-    // los nombres de carpeta/archivo estén estandarizados, quien sube el
-    // archivo elige a mano dónde va (o crea una carpeta nueva) dentro de la
-    // carpeta ya estandarizada de la empresa — no lo adivina el backend.
+    // Habilitación renovada: abre la carpeta de la empresa en Drive (ahí se
+    // arrastra el archivo a mano) y pide la fecha de vencimiento, que es lo
+    // que el panel necesita para recalcular el semáforo.
     card.querySelectorAll('.exp-row').forEach(fila=>{
-      const input = fila.querySelector('.hab-input');
-      fila.querySelector('.btn-hab').addEventListener('click', ()=> input.click());
-      input.addEventListener('change', ()=>{
-        if(!input.files.length) return;
-        const file = input.files[0];
-        input.value = '';   // para poder re-elegir el mismo archivo si hace falta reintentar
-
+      fila.querySelector('.btn-hab').addEventListener('click', ()=>{
         const tile = fila.closest('.tile');
         const idx = [...card.querySelectorAll('.tile')].indexOf(tile);
         const it = emp.items[idx];
+
         let ok = tile.querySelector('.hab-nueva');
         if(!ok){
           ok = document.createElement('div');
@@ -1431,51 +1333,35 @@ function render(empresas){
           fila.insertAdjacentElement('afterend', ok);
         }
 
-        if(!carpetas.carpetaId){
-          ok.innerHTML = '<div class="linea">No tengo la carpeta de esta empresa en Drive.</div>';
-          return;
-        }
+        // El link de la resolución apunta al PDF dentro de la carpeta del
+        // expediente, así que abre más cerca del lugar exacto que la raíz.
+        const destino = it.resolucion_url || carpetas.carpeta;
+        if(destino) abrirEnDrive(destino);
 
-        ok.innerHTML = '<div class="linea">Elegí la carpeta donde guardar «' + escapeHtml(file.name) + '»…</div>';
-        elegirCarpeta(carpetas.carpetaId).then(carpeta=>{
-          if(!carpeta){
-            ok.innerHTML = '<div class="linea">Subida cancelada.</div>';
-            return;
-          }
-          ok.innerHTML = '<div class="linea">Subiendo a «' + escapeHtml(carpeta.nombre) + '»…</div>';
-          subirAlBackend(file, { carpetaId: carpeta.id, empresa: emp.empresa }).then(r=>{
-            if(!r.ok){
-              ok.innerHTML = '<div class="linea">No se pudo subir: ' + escapeHtml(r.detalle || r.error) + '</div>';
-              return;
+        ok.innerHTML = `
+          <div class="linea">${destino
+            ? ico('carpeta') + ' Drive abierto en otra pestaña — soltá ahí el archivo'
+            : 'No tengo la carpeta de esta empresa en Drive'}</div>
+          <div class="fechas-renovacion">
+            <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
+            <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
+            <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
+            <span class="fechas-guardado">Guardado</span>
+          </div>`;
+
+        const btnGuardar = ok.querySelector('.btn-guardar-fechas');
+        btnGuardar.addEventListener('click', ()=>{
+          const otorgada = ok.querySelector('.fecha-otorgada').value;
+          const vencimiento = ok.querySelector('.fecha-vencimiento').value;
+          if(!vencimiento) return;
+          btnGuardar.disabled = true;
+          llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento }).then(res=>{
+            btnGuardar.disabled = false;
+            if(res.ok){
+              ok.querySelector('.fechas-guardado').classList.add('on');
+              cargarDatos();
             }
-            const linea = '<div class="linea">' + ico('check') + ' Guardado en ' + escapeHtml(r.carpeta) +
-              ' — <a class="doc-link" href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">ver</a></div>';
-            // Se pide la fecha de vencimiento para cualquier tipo de
-            // habilitación renovada, no solo para las categorías más comunes.
-            ok.innerHTML = linea + `
-              <div class="fechas-renovacion">
-                <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
-                <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
-                <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
-                <span class="fechas-guardado">Guardado</span>
-              </div>`;
-            const btnGuardar = ok.querySelector('.btn-guardar-fechas');
-            btnGuardar.addEventListener('click', ()=>{
-              const otorgada = ok.querySelector('.fecha-otorgada').value;
-              const vencimiento = ok.querySelector('.fecha-vencimiento').value;
-              if(!vencimiento) return;
-              btnGuardar.disabled = true;
-              llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento }).then(res=>{
-                btnGuardar.disabled = false;
-                if(res.ok){
-                  ok.querySelector('.fechas-guardado').classList.add('on');
-                  cargarDatos();
-                }
-              }).catch(()=>{ btnGuardar.disabled = false; });
-            });
-          }).catch(()=>{ ok.innerHTML = '<div class="linea">No se pudo subir. Probá de nuevo.</div>'; });
-        }).catch(()=>{
-          ok.innerHTML = '<div class="linea">No se pudo abrir el selector de carpetas de Drive. Probá de nuevo.</div>';
+          }).catch(()=>{ btnGuardar.disabled = false; });
         });
       });
     });
@@ -1509,24 +1395,21 @@ function render(empresas){
       });
     });
 
-    // Simulacion local de la subida: actualiza fecha y pinta de verde.
+    // Auditoría hecha: el informe se sube a mano en Drive (el botón de carpeta
+    // de al lado lo abre); acá solo se registra la fecha y la franja se pone
+    // en verde.
     const strip = card.querySelector('.auditoria');
     if(strip){
-      const input = strip.querySelector('.file-input');
-      strip.querySelector('.btn-subir').addEventListener('click', ()=> input.click());
-      input.addEventListener('change', ()=>{
-        if(!input.files.length) return;
-        const nombre = input.files[0].name;
-        subirAlBackend(input.files[0], { empresa: emp.empresa, tipo: 'auditoria' })
-          .then(()=> llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: nombre }))
-          .catch(()=>{});
+      const btnHecha = strip.querySelector('.btn-subir');
+      btnHecha.addEventListener('click', ()=>{
+        btnHecha.disabled = true;
+        llamarBackend('setAuditoria', { fila: emp.auditoria.fila })
+          .then(()=> cargarDatos())
+          .catch(()=>{ btnHecha.disabled = false; });
         strip.className = 'auditoria verde';
-        strip.querySelector('.fecha').textContent = fmtFecha(HOY.toISOString().slice(0,10));
+        strip.querySelector('.fecha').textContent = fmtFecha(new Date().toISOString().slice(0,10));
         const dias = strip.querySelector('.dias');
         if(dias) dias.textContent = 'hace 0 días · Al día';
-        const nota = strip.querySelector('.nota');
-        if(nota) nota.textContent = nombre;
-        else strip.insertAdjacentHTML('beforeend', `<span class="nota">${escapeHtml(nombre)}</span>`);
       });
     }
 
