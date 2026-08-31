@@ -712,6 +712,7 @@ function intentarLogin(primerIntento){
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('dashboardScreen').style.display = 'block';
       arrancar({ generado: data.generado, empresas: data.empresas });
+      cargarLogos();   // decorativos: llegan después, sin frenar el panel
     });
   }).catch(()=>{
     if(primerIntento) return intentarLogin(false);
@@ -761,11 +762,33 @@ function cargarDatos(){
   return llamarBackend('getData', {}).then(data=>{
     if(data.ok){
       EQUIPO = data.equipo || [];
+      // getData ya no trae los logos: se conservan los que ya estén en pantalla
+      // para que no desaparezcan al actualizar.
+      const previos = {};
+      (window.PAYLOAD ? window.PAYLOAD.empresas : []).forEach(e=>{ previos[e.empresa] = e.logo; });
+      data.empresas.forEach(e=>{ e.logo = previos[e.empresa] || null; });
       window.PAYLOAD = { generado: data.generado, empresas: data.empresas };
       aplicar();
     }
     return data;
   });
+}
+
+// Los logos pesan más de 1 MB en total y son decorativos, así que se piden
+// después de que el panel ya está a la vista. Mientras tanto cada empresa
+// muestra sus iniciales.
+function cargarLogos(){
+  return llamarBackend('getLogos', {}).then(data=>{
+    if(!data.ok || !window.PAYLOAD) return data;
+    const slug = s => String(s).trim().toLowerCase().replace(/\s+/g,' ').replace(/[^a-z0-9]/g,'');
+    let alguno = false;
+    window.PAYLOAD.empresas.forEach(emp=>{
+      const l = data.logos[slug(emp.empresa)];
+      if(l){ emp.logo = l; alguno = true; }
+    });
+    if(alguno) aplicar();
+    return data;
+  }).catch(()=>{});   // sin logos el panel funciona igual
 }
 
 function arrancar(payload){
