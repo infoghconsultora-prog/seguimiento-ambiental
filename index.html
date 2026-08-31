@@ -1076,6 +1076,18 @@ const AUD_LABEL = {
   porconfirmar:'Frecuencia a confirmar'
 };
 
+/* Los recuadros se dibujan agrupados (Predio, Transporte, Hidráulica, y
+   después municipalidad/bomberos), en un orden que NO es el de la planilla,
+   y encima el filtro por estado puede esconder algunos. Por eso cada recuadro
+   lleva su número de fila en el HTML y se lo busca por ahí: ubicarlo por
+   posición devolvía otra habilitación, y las fechas terminaban escritas en la
+   fila equivocada del Sheets. */
+function itemDeTile(emp, tile){
+  if(!tile) return null;
+  const fila = Number(tile.dataset.fila);
+  return emp.items.find(i => i.fila === fila) || null;
+}
+
 function tileHtml(it){
   const vencLine = it.vencimiento
     ? `<div class="tile-venc badge ${it.estado_semaforo}">${fmtFecha(it.vencimiento)}${it.venc_inferida ? ' *' : ''}</div>`
@@ -1118,7 +1130,7 @@ function tileHtml(it){
        <div class="obs-guardado">Guardado</div>
      </div>`);
 
-  return `<div class="tile">
+  return `<div class="tile" data-fila="${it.fila}">
     <div class="tile-top">
       <span class="tile-label">${escapeHtml(it.label)}</span>
       ${it.grupo && it.grupo !== '—' ? `<span class="tipo-chip">${escapeHtml(it.grupo)}</span>` : ''}
@@ -1339,9 +1351,8 @@ function render(empresas){
     // Preview del mail que dispara cada aviso.
     card.querySelectorAll('.ver-mail').forEach((btn, i)=>{
       btn.addEventListener('click', ()=>{
-        const tile = btn.closest('.tile');
-        const idx = [...card.querySelectorAll('.tile')].indexOf(tile);
-        const it = emp.items[idx];
+        const it = itemDeTile(emp, btn.closest('.tile'));
+        if(!it) return;
         verMail(emp.empresa, it, btn.dataset.tipo);
 
         // En el mail de asignacion, tocar un nombre lo deja anotado en la habilitacion.
@@ -1370,8 +1381,8 @@ function render(empresas){
         input.value = '';   // permite volver a elegir el mismo archivo si hay que reintentar
 
         const tile = fila.closest('.tile');
-        const idx = [...card.querySelectorAll('.tile')].indexOf(tile);
-        const it = emp.items[idx];
+        const it = itemDeTile(emp, tile);
+        if(!it) return;
 
         let ok = tile.querySelector('.hab-nueva');
         if(!ok){
