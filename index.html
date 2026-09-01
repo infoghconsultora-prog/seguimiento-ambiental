@@ -932,7 +932,7 @@ function datosMail(empresa, it){
 // Mismos botones que arma el backend, para que la vista previa no muestre
 // algo distinto de lo que realmente se envía.
 function botonesAsignar(){
-  return EQUIPO.filter(p => p.email !== 'info.ghconsultora@gmail.com').map(p =>
+  return EQUIPO.filter(p => p.avisos).map(p =>
     `<a href="#" style="display:inline-block;margin:0 6px 6px 0;padding:8px 12px;background:#ffffff;
        border:1px solid ${GH_VERDE_OSC};color:${GH_VERDE_OSC};border-radius:6px;text-decoration:none;
        font-size:12.5px;font-weight:bold;">${escapeHtml(p.nombre)}</a>`).join('');
