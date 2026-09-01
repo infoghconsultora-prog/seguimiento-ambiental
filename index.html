@@ -687,6 +687,7 @@ function intentarLogin(primerIntento){
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('dashboardScreen').style.display = 'block';
       arrancar({ generado: data.generado, empresas: data.empresas });
+      aplicarAsignacionDeUrl();
       cargarLogos();   // decorativos: llegan después, sin frenar el panel
     });
   }).catch(()=>{
@@ -734,6 +735,22 @@ let BUSQUEDA = '';
 // backend (ya se calcularon una vez al hacer login) — por eso esto es
 // rápido. Se usa desde el botón "Actualizar" general y después de guardar
 // las fechas de una renovación, para que el semáforo quede al día.
+/* El mail de "definir responsable" trae un botón por persona, y cada uno abre
+   el panel con ?asignar=Nombre&fila=N. Acá se toma ese dato y se escribe en la
+   planilla — antes el link abría el panel y no pasaba nada. Después se limpia
+   la URL, así refrescar la página no vuelve a asignar. */
+function aplicarAsignacionDeUrl(){
+  const p = new URLSearchParams(location.search);
+  const responsable = p.get('asignar');
+  const fila = Number(p.get('fila'));
+  if(!responsable || !fila) return Promise.resolve();
+
+  return llamarBackend('setResponsable', { fila, responsable }).then(r=>{
+    history.replaceState({}, '', location.pathname);
+    if(r.ok) return cargarDatos();
+  }).catch(()=>{});
+}
+
 function cargarDatos(){
   return llamarBackend('getData', {}).then(data=>{
     if(data.ok){
@@ -1408,10 +1425,12 @@ function render(empresas){
         document.querySelectorAll('#mailPrev a').forEach(a=>{
           a.addEventListener('click', ev=>{
             ev.preventDefault();
-            const txt = a.textContent.trim();
-            it.responsable = txt.startsWith('✋') ? 'Vos' : txt;
+            // Antes esto solo pintaba el nombre en pantalla y se perdía al
+            // refrescar: ahora queda escrito en la planilla.
+            const nombre = a.textContent.trim();
             document.getElementById('modalOverlay').classList.remove('on');
-            aplicar();
+            llamarBackend('setResponsable', { fila: it.fila, responsable: nombre })
+              .then(()=> cargarDatos()).catch(()=>{});
           });
         });
       });
