@@ -251,14 +251,7 @@
     color:inherit; border-radius:var(--r-pill); padding:4px 11px; font-size:12px; font-weight:600; cursor:pointer; }
   .resp{ margin-top:8px; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
     background:var(--verde-bg); border-radius:var(--r-sm); padding:8px 11px;
-    display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
-  /* Sin nadie asignado se muestra en gris, para que no parezca resuelto. */
-  .resp.vacia{ background:var(--gris-bg); color:var(--label-2); }
-  .resp select{ font-family:inherit; font-size:13px; font-weight:600; color:inherit;
-    border:none; border-radius:6px; padding:3px 6px; margin-left:auto; cursor:pointer;
-    background:rgba(255,255,255,.65); }
-  .resp .resp-ok{ font-size:12px; font-weight:600; opacity:0; transition:opacity .2s var(--ease); }
-  .resp .resp-ok.on{ opacity:1; }
+    display:flex; align-items:center; gap:7px; }
   .hab-nueva{ margin-top:8px; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
     background:var(--verde-bg); border-radius:var(--r-sm); padding:8px 11px; }
   .hab-nueva > .linea{ display:flex; align-items:center; gap:7px; }
@@ -936,26 +929,31 @@ function datosMail(empresa, it){
 }
 
 // 1er mail (amarillo): va a todo el equipo, para que alguien se haga cargo.
-function mailAsignacion(empresa, it){
-  const botones = EQUIPO.map(p =>
+// Mismos botones que arma el backend, para que la vista previa no muestre
+// algo distinto de lo que realmente se envía.
+function botonesAsignar(){
+  return EQUIPO.filter(p => p.email !== 'info.ghconsultora@gmail.com').map(p =>
     `<a href="#" style="display:inline-block;margin:0 6px 6px 0;padding:8px 12px;background:#ffffff;
        border:1px solid ${GH_VERDE_OSC};color:${GH_VERDE_OSC};border-radius:6px;text-decoration:none;
        font-size:12.5px;font-weight:bold;">${escapeHtml(p.nombre)}</a>`).join('');
-  const cuerpo = datosMail(empresa, it) + `
-    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:18px;">
+}
+
+function bloqueAsignar(titulo){
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:14px;">
       <tr><td style="background:#eaf4e2;border-left:4px solid ${GH_VERDE_OSC};padding:12px 14px;">
-        <strong style="color:${GH_TINTA};font-size:14px;">¿Quién se hace cargo de la renovación?</strong>
+        <strong style="color:${GH_TINTA};font-size:14px;">${titulo}</strong>
         <div style="margin-top:4px;color:${GH_SUAVE};font-size:12.5px;">
-          Al tocar tu nombre quedás anotado como responsable en la habilitación,
-          y los avisos siguientes te llegan solo a vos.</div>
-        <div style="margin-top:10px;">
-          <a href="#" style="display:inline-block;padding:9px 14px;background:${GH_VERDE_OSC};color:#ffffff;
-             border-radius:6px;text-decoration:none;font-size:13px;font-weight:bold;">✋ Me hago cargo</a>
-        </div>
-        <div style="margin-top:12px;color:${GH_SUAVE};font-size:11.5px;">O asignáselo a otra persona:</div>
-        <div style="margin-top:6px;">${botones}</div>
+          Al tocar un nombre queda anotado como responsable, y los avisos
+          siguientes le llegan solo a esa persona.</div>
+        <div style="margin-top:10px;">${botonesAsignar()}</div>
       </td></tr>
     </table>`;
+}
+
+function mailAsignacion(empresa, it){
+  const cuerpo = datosMail(empresa, it) +
+    bloqueAsignar('¿Quién se hace cargo de la renovación?');
   return marcoMail(
     'Renovación a definir responsable',
     `Faltan ${it.dias_venc} días para que venza esta habilitación. Hay que definir quién gestiona la renovación.`,
@@ -973,14 +971,14 @@ function mailRenovacion(empresa, it){
         <div style="margin-top:4px;color:${GH_SUAVE};font-size:12.5px;">
           Quedan ${it.dias_venc} días. Cuando la presentes, subí la nueva habilitación al panel.</div>
       </td></tr>
-    </table>`;
+    </table>` + (resp ? '' : bloqueAsignar('Todavía nadie se hizo cargo'));
   return marcoMail(
     'Presentar solicitud de renovación',
     resp ? `${escapeHtml(resp)}, esta habilitación entra en los 3 meses previos al vencimiento.`
          : 'Esta habilitación entra en los 3 meses previos al vencimiento.',
     cuerpo,
     resp ? `Enviado solo a ${escapeHtml(resp)}, responsable de esta gestión`
-         : 'Sin responsable asignado todavía — se envía a todo el equipo');
+         : 'Sin responsable asignado — se envía a quienes gestionan las renovaciones');
 }
 
 function verMail(empresa, it, tipo){
@@ -1171,20 +1169,10 @@ function tileHtml(it){
     avisoMail = `<div class="aviso-mail amarillo">${ico('sobre')} <span>Definir responsable de la renovación${dv!=null?` — faltan ${dv} días`:''}</span>
                    <button type="button" class="ver-mail" data-tipo="asignacion">Ver mail</button></div>`;
   }
-  // Se puede asignar desde acá, sin depender del mail: el de "definir
-  // responsable" solo sale una vez, en la ventana de amarillo.
-  const respLinea = it.nivel !== 1 ? '' : `
-    <div class="resp${it.responsable ? '' : ' vacia'}">
-      ${ico('persona')}
-      <span>Responsable</span>
-      <select class="sel-responsable">
-        <option value=""${it.responsable ? '' : ' selected'}>Sin asignar</option>
-        ${EQUIPO.filter(p => p.email !== 'info.ghconsultora@gmail.com')
-          .map(p => `<option value="${escapeHtml(p.nombre)}"${
-            it.responsable === p.nombre ? ' selected' : ''}>${escapeHtml(p.nombre)}</option>`).join('')}
-      </select>
-      <span class="resp-ok">Guardado</span>
-    </div>`;
+  // Solo muestra quién se hizo cargo. La asignación se hace tocando el nombre
+  // en el mail, no acá.
+  const respLinea = it.responsable
+    ? `<div class="resp">${ico('persona')} Responsable: ${escapeHtml(it.responsable)}</div>` : '';
 
   // La resolucion es el documento real de la habilitacion: si tiene link, va visible.
   const resLink = (it.resolucion && it.resolucion_url)
@@ -1431,26 +1419,6 @@ function render(empresas){
         if(e.key === 'Escape'){ e.preventDefault(); cerrar(false); }
       });
       celda.addEventListener('blur', ()=> cerrar(true));
-    });
-
-    // Asignar responsable desde el propio recuadro. No se redibuja toda la
-    // tarjeta: así no se cierra lo que el usuario tenga desplegado.
-    card.querySelectorAll('.sel-responsable').forEach(sel=>{
-      sel.addEventListener('change', ()=>{
-        const it = itemDeTile(emp, sel.closest('.tile'));
-        if(!it) return;
-        const valor = sel.value;
-        sel.disabled = true;
-        llamarBackend('setResponsable', { fila: it.fila, responsable: valor }).then(r=>{
-          sel.disabled = false;
-          if(!r.ok) return;
-          it.responsable = valor || null;
-          sel.closest('.resp').classList.toggle('vacia', !valor);
-          const ok = sel.parentElement.querySelector('.resp-ok');
-          ok.classList.add('on');
-          setTimeout(()=> ok.classList.remove('on'), 1600);
-        }).catch(()=>{ sel.disabled = false; });
-      });
     });
 
     // Preview del mail que dispara cada aviso.
