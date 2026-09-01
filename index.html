@@ -96,10 +96,9 @@
       radial-gradient(circle at 76% 12%, color-mix(in srgb,var(--accent) 30%,transparent), transparent 58%); }
   header, main, footer{ position:relative; z-index:1; }
   .brand{ display:flex; align-items:center; gap:12px; }
-  .logo{ font-weight:700; font-size:22px; letter-spacing:-.4px; line-height:1.35;
-    padding:2px 1px; display:inline-block;
-    background:linear-gradient(135deg,var(--accent),var(--brand));
-    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  /* Logo original de la consultora, sin fondo ni sombra. Antes era texto con
+     un degradado recortado, que además se cortaba en algunas pantallas. */
+  .logo{ height:34px; width:auto; display:block; flex:0 0 auto; }
   .brand-text h1{ font-size:20px; line-height:25px; margin:0; font-weight:600; letter-spacing:-.3px; }
   .brand-text .sub{ font-size:13px; line-height:18px; color:var(--label-2); font-weight:400; }
   .head-right{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
@@ -252,7 +251,14 @@
     color:inherit; border-radius:var(--r-pill); padding:4px 11px; font-size:12px; font-weight:600; cursor:pointer; }
   .resp{ margin-top:8px; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
     background:var(--verde-bg); border-radius:var(--r-sm); padding:8px 11px;
-    display:flex; align-items:center; gap:7px; }
+    display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  /* Sin nadie asignado se muestra en gris, para que no parezca resuelto. */
+  .resp.vacia{ background:var(--gris-bg); color:var(--label-2); }
+  .resp select{ font-family:inherit; font-size:13px; font-weight:600; color:inherit;
+    border:none; border-radius:6px; padding:3px 6px; margin-left:auto; cursor:pointer;
+    background:rgba(255,255,255,.65); }
+  .resp .resp-ok{ font-size:12px; font-weight:600; opacity:0; transition:opacity .2s var(--ease); }
+  .resp .resp-ok.on{ opacity:1; }
   .hab-nueva{ margin-top:8px; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
     background:var(--verde-bg); border-radius:var(--r-sm); padding:8px 11px; }
   .hab-nueva > .linea{ display:flex; align-items:center; gap:7px; }
@@ -433,7 +439,7 @@
   #loginScreen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
   .login-card{ background:var(--surface); border-radius:var(--r-xl); padding:40px 36px;
     max-width:420px; width:100%; text-align:center; box-shadow:var(--shadow-elevated); }
-  .login-logo{ font-size:44px; line-height:1.3; padding:4px 2px; margin-bottom:10px; }
+  .login-logo{ height:64px; margin:0 auto 18px; }
   #loginScreen h1{ font-size:22px; line-height:28px; font-weight:600; margin:0 0 8px; letter-spacing:-.35px; }
   #loginScreen p{ font-size:15px; line-height:20px; color:var(--label-2); margin:0 0 24px; }
   #gsiButton{ display:flex; justify-content:center; }
@@ -465,7 +471,7 @@
 
 <div id="loginScreen">
   <div class="login-card">
-    <div class="logo login-logo">GH</div>
+    <img class="logo login-logo" src="logo-gh.png" alt="GH Consultora">
     <h1>Seguimiento Ambiental</h1>
     <p>GH Consultora · Gestión Ambiental<br>
        Iniciá sesión con una cuenta de Google autorizada para ver el panel.</p>
@@ -481,7 +487,7 @@
 <div id="dashboardScreen">
 <header>
   <div class="brand">
-    <div class="logo">GH</div>
+    <img class="logo" src="logo-gh.png" alt="GH Consultora">
     <div class="brand-text">
       <h1>Seguimiento Ambiental</h1>
       <div class="sub">GH Consultora · Gestión Ambiental</div>
@@ -905,10 +911,11 @@ function marcoMail(titulo, bajada, cuerpo, pie){
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f7f8f4;padding:18px 0;">
   <tr><td align="center">
   <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #dfe3da;border-radius:10px;overflow:hidden;">
-    <tr><td style="background:${GH_VERDE_OSC};padding:14px 20px;">
-      <div style="color:#ffffff;font-size:19px;font-weight:bold;letter-spacing:-.3px;">GH CONSULTORA</div>
-      <div style="color:${GH_VERDE};font-size:11px;letter-spacing:1px;text-transform:uppercase;">Gestión Ambiental</div>
+    <tr><td style="background:#ffffff;padding:18px 20px 14px;">
+      <img src="logo-gh.png" alt="GH Consultora" height="38" style="height:38px;width:auto;display:block;border:0;">
+      <div style="color:${GH_VERDE_OSC};font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-top:8px;">Gestión Ambiental</div>
     </td></tr>
+    <tr><td style="background:${GH_VERDE_OSC};font-size:0;line-height:0;height:4px;">&nbsp;</td></tr>
     <tr><td style="padding:20px;">
       <div style="font-size:17px;font-weight:bold;color:${GH_TINTA};margin-bottom:2px;">${titulo}</div>
       <div style="font-size:13px;color:${GH_SUAVE};margin-bottom:14px;">${bajada}</div>
@@ -1164,8 +1171,20 @@ function tileHtml(it){
     avisoMail = `<div class="aviso-mail amarillo">${ico('sobre')} <span>Definir responsable de la renovación${dv!=null?` — faltan ${dv} días`:''}</span>
                    <button type="button" class="ver-mail" data-tipo="asignacion">Ver mail</button></div>`;
   }
-  const respLinea = it.responsable
-    ? `<div class="resp">${ico('persona')} Responsable: ${escapeHtml(it.responsable)}</div>` : '';
+  // Se puede asignar desde acá, sin depender del mail: el de "definir
+  // responsable" solo sale una vez, en la ventana de amarillo.
+  const respLinea = it.nivel !== 1 ? '' : `
+    <div class="resp${it.responsable ? '' : ' vacia'}">
+      ${ico('persona')}
+      <span>Responsable</span>
+      <select class="sel-responsable">
+        <option value=""${it.responsable ? '' : ' selected'}>Sin asignar</option>
+        ${EQUIPO.filter(p => p.email !== 'info.ghconsultora@gmail.com')
+          .map(p => `<option value="${escapeHtml(p.nombre)}"${
+            it.responsable === p.nombre ? ' selected' : ''}>${escapeHtml(p.nombre)}</option>`).join('')}
+      </select>
+      <span class="resp-ok">Guardado</span>
+    </div>`;
 
   // La resolucion es el documento real de la habilitacion: si tiene link, va visible.
   const resLink = (it.resolucion && it.resolucion_url)
@@ -1412,6 +1431,26 @@ function render(empresas){
         if(e.key === 'Escape'){ e.preventDefault(); cerrar(false); }
       });
       celda.addEventListener('blur', ()=> cerrar(true));
+    });
+
+    // Asignar responsable desde el propio recuadro. No se redibuja toda la
+    // tarjeta: así no se cierra lo que el usuario tenga desplegado.
+    card.querySelectorAll('.sel-responsable').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        const it = itemDeTile(emp, sel.closest('.tile'));
+        if(!it) return;
+        const valor = sel.value;
+        sel.disabled = true;
+        llamarBackend('setResponsable', { fila: it.fila, responsable: valor }).then(r=>{
+          sel.disabled = false;
+          if(!r.ok) return;
+          it.responsable = valor || null;
+          sel.closest('.resp').classList.toggle('vacia', !valor);
+          const ok = sel.parentElement.querySelector('.resp-ok');
+          ok.classList.add('on');
+          setTimeout(()=> ok.classList.remove('on'), 1600);
+        }).catch(()=>{ sel.disabled = false; });
+      });
     });
 
     // Preview del mail que dispara cada aviso.
