@@ -754,11 +754,17 @@ function aplicarAsignacionDeUrl(){
   const p = new URLSearchParams(location.search);
   const responsable = p.get('asignar');
   const fila = Number(p.get('fila'));
+  // El mail también trae la empresa: el backend la usa para confirmar que esa
+  // fila siga siendo de esa empresa antes de escribir.
+  const empresa = p.get('empresa') || '';
   if(!responsable || !fila) return Promise.resolve();
 
-  return llamarBackend('setResponsable', { fila, responsable }).then(r=>{
+  return llamarBackend('setResponsable', { fila, responsable, empresa }).then(r=>{
     history.replaceState({}, '', location.pathname);
     if(r.ok) return cargarDatos();
+    avisoBarra(r.error === 'fila_desactualizada'
+      ? 'La planilla cambió: no se pudo asignar. Buscá la habilitación en el panel.'
+      : 'No se pudo asignar el responsable.');
   }).catch(()=>{});
 }
 
@@ -1019,8 +1025,10 @@ function verMail(empresa, it, tipo){
     estado.textContent = 'Enviando…';
     llamarBackend('mailRenovacion', {
       tipo,
-      item: Object.assign({}, it, { empresa }),
-      urlPanel: location.href.split('?')[0]
+      item: Object.assign({}, it, { empresa })
+      // La dirección del panel ya no se manda: la pone el backend, que es el
+      // único que la sabe bien (desde el navegador quedaba mal en los avisos
+      // automáticos y era un agujero para inyectar HTML en el mail).
     }).then(r=>{
       if(r.ok){
         estado.textContent = 'Enviado a ' + (r.enviadoA || '').replace(/,/g, ', ');
@@ -1447,8 +1455,21 @@ function render(empresas){
         pista.classList.remove('on');
         if(guardar && valor !== previo){
           emp[campo] = valor;
-          llamarBackend('setDatoEmpresa', { fila: emp.fila, campo, valor })
-            .catch(()=>{ celda.textContent = previo || 'sin cargar'; });
+          // Si el backend rechaza el cambio, la celda vuelve a lo que había:
+          // antes solo se revertía cuando fallaba la red, así que un rechazo
+          // dejaba en pantalla un valor que no se había guardado.
+          const revertir = ()=>{
+            emp[campo] = previo;
+            celda.textContent = previo || 'sin cargar';
+            celda.classList.toggle('empty', !previo);
+          };
+          llamarBackend('setDatoEmpresa', { fila: emp.fila, campo, valor, empresa: emp.empresa })
+            .then(r=>{
+              if(r.ok) return;
+              revertir();
+              if(!planillaCambio(r)) avisoBarra('No se pudo guardar el cambio.');
+            })
+            .catch(revertir);
         } else if(!guardar){
           emp[campo] = previo;
         }
@@ -1479,7 +1500,7 @@ function render(empresas){
             // refrescar: ahora queda escrito en la planilla.
             const nombre = a.textContent.trim();
             document.getElementById('modalOverlay').classList.remove('on');
-            llamarBackend('setResponsable', { fila: it.fila, responsable: nombre })
+            llamarBackend('setResponsable', { fila: it.fila, responsable: nombre, empresa: emp.empresa })
               .then(()=> cargarDatos()).catch(()=>{});
           });
         });
@@ -1544,13 +1565,20 @@ function render(empresas){
             const vencimiento = ok.querySelector('.fecha-vencimiento').value;
             if(!vencimiento) return;
             btnGuardar.disabled = true;
-            llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento }).then(res=>{
+            llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento, empresa: emp.empresa }).then(res=>{
               btnGuardar.disabled = false;
               if(res.ok){
                 ok.querySelector('.fechas-guardado').classList.add('on');
                 cargarDatos();
+              } else if(!planillaCambio(res)){
+                // Antes, si el guardado fallaba no pasaba nada en pantalla:
+                // la persona se quedaba creyendo que la fecha quedó cargada.
+                avisoBarra('No se pudieron guardar las fechas.');
               }
-            }).catch(()=>{ btnGuardar.disabled = false; });
+            }).catch(()=>{
+              btnGuardar.disabled = false;
+              avisoBarra('No se pudieron guardar las fechas.');
+            });
           });
         }
 
@@ -1659,13 +1687,13 @@ function render(empresas){
           const valor = ta.value;
           aviso.textContent = 'Guardando…';
           aviso.classList.add('on');
-          llamarBackend('setCampo', { fila: it.fila, campo, valor }).then(r=>{
+          llamarBackend('setCampo', { fila: it.fila, campo, valor, empresa: emp.empresa }).then(r=>{
             if(r.ok){
               if(campo === 'estado') it.estado_texto = valor; else it.observaciones = valor;
               aviso.textContent = 'Guardado';
               setTimeout(()=> aviso.classList.remove('on'), 1600);
             } else {
-              aviso.textContent = 'No se pudo guardar';
+              aviso.textContent = planillaCambio(r) ? 'La planilla cambió' : 'No se pudo guardar';
             }
           }).catch(()=>{ aviso.textContent = 'No se pudo guardar'; });
         }, 900);
@@ -1707,7 +1735,8 @@ function render(empresas){
           if(!r.ok){ aviso('No se pudo subir: ' + (r.detalle || r.error)); return; }
           aviso(file.name);
           // La subida vale como auditoría hecha: se registra la fecha de hoy.
-          llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: file.name, url: r.url })
+          llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: file.name, url: r.url,
+                          nombrePlanilla: emp.auditoria.nombre_planilla })
             .then(()=> cargarDatos()).catch(()=>{});
           strip.className = 'auditoria verde';
           strip.querySelector('.fecha').textContent = fmtFecha(new Date().toISOString().slice(0,10));
@@ -1726,7 +1755,8 @@ function render(empresas){
         btnDeshacerAud.addEventListener('click', ()=>{
           btnDeshacerAud.disabled = true;
           btnDeshacerAud.classList.add('girando');
-          llamarBackend('deshacerSubida', { tipo:'aud', fila: emp.auditoria.fila }).then(r=>{
+          llamarBackend('deshacerSubida', { tipo:'aud', fila: emp.auditoria.fila,
+                                            nombrePlanilla: emp.auditoria.nombre_planilla }).then(r=>{
             if(r.ok) return cargarDatos();
             btnDeshacerAud.disabled = false;
             btnDeshacerAud.classList.remove('girando');
@@ -1740,6 +1770,14 @@ function render(empresas){
 
     cont.appendChild(card);
   });
+
+  // Sin esto, una búsqueda sin resultados deja la pantalla en blanco y no se
+  // sabe si el panel se rompió o si de verdad no hay nada.
+  if(!cont.children.length){
+    cont.innerHTML = BUSQUEDA
+      ? `<div class="empty-hint">No hay ninguna empresa que coincida con «${escapeHtml(BUSQUEDA)}».</div>`
+      : `<div class="empty-hint">No hay empresas para mostrar con este filtro.</div>`;
+  }
 
   // Después de redibujar, la página vuelve a donde estaba. Sin esto, un
   // refresco automático te manda al principio de la lista mientras estás
@@ -1789,12 +1827,27 @@ function chequearVersion(){
   }).catch(()=>{}).then(()=>{ syncEnCurso = false; });
 }
 
-function avisarActualizado(){
+// Cartel breve abajo del todo, para lo que no tiene un lugar propio en la
+// pantalla: cambios que entraron de otra persona, o un guardado rechazado.
+function avisoBarra(texto, ms){
   const t = document.getElementById('toastSync');
   if(!t) return;
+  t.textContent = texto;
   t.classList.add('on');
-  clearTimeout(avisarActualizado.t);
-  avisarActualizado.t = setTimeout(()=> t.classList.remove('on'), 2600);
+  clearTimeout(avisoBarra.t);
+  avisoBarra.t = setTimeout(()=> t.classList.remove('on'), ms || 2600);
+}
+
+function avisarActualizado(){ avisoBarra('Datos actualizados'); }
+
+// Cuando el backend rechaza una escritura porque la planilla se movió, no
+// alcanza con avisar: hay que traer los datos nuevos, si no la próxima
+// edición vuelve a fallar igual.
+function planillaCambio(r){
+  if(!r || r.ok || r.error !== 'fila_desactualizada') return false;
+  avisoBarra('La planilla cambió. Actualizando el panel…', 4000);
+  cargarDatos();
+  return true;
 }
 
 function arrancarSync(){
