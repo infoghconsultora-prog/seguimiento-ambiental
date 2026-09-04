@@ -433,6 +433,17 @@
     #modalHead::before{ content:""; position:absolute; top:7px; left:50%; transform:translateX(-50%);
       width:36px; height:5px; border-radius:var(--r-pill); background:var(--separator); }
     #modalHead{ padding-top:20px; }
+
+    /* La franja de auditoría era una fila: en un teléfono las acciones no
+       cedían espacio (flex:0 0 auto) y la fecha con el "hace N días" quedaba
+       exprimida en una columna de tres renglones. Acá se apila. */
+    .aud-main{ flex-direction:column; align-items:stretch; gap:12px; }
+    .aud-acciones{ flex-wrap:wrap; }
+    .auditoria .btn-subir{ flex:1 1 auto; justify-content:center; }
+
+    /* Los recuadros de conteo ocupaban una pantalla entera antes de llegar a
+       las empresas: en dos columnas entran todos de una. */
+    .stats{ grid-template-columns:repeat(2,1fr); gap:10px; }
   }
 
   /* ---------- login ---------- */
@@ -1244,8 +1255,9 @@ function tileHtml(it){
 }
 
 function auditoriaHtml(a, carpetas){
-  const btnPredio = carpetas && carpetas.predio
-    ? `<a class="folder-btn" href="${escapeHtml(carpetas.predio)}" target="_blank" rel="noopener" title="Carpeta Predio" aria-label="Carpeta Predio">${ico('carpeta')}</a>` : '';
+  // Acá va SOLO la carpeta de auditorías. Predio tiene su propio botón en el
+  // encabezado del grupo "Ambiente · Predio", así que tenerlo también acá era
+  // el mismo acceso repetido dos veces en la misma tarjeta.
   const btnAuditoria = carpetas && carpetas.auditoria
     ? `<a class="folder-btn" href="${escapeHtml(carpetas.auditoria)}" target="_blank" rel="noopener" title="Carpeta de auditorías ambientales" aria-label="Carpeta de auditorías ambientales">${ico('carpetaAud')}</a>` : '';
 
@@ -1263,7 +1275,6 @@ function auditoriaHtml(a, carpetas){
             <span class="fecha">Sin visitas registradas</span>
           </div>
           <div class="aud-acciones">
-            ${btnPredio}
             ${btnAuditoria}
           </div>
         </div>
@@ -1275,7 +1286,9 @@ function auditoriaHtml(a, carpetas){
   const fecha = a.ultima ? fmtFecha(a.ultima) : 'Sin registrar';
   const dias = (a.dias === null || a.dias === undefined) ? '' :
     `<span class="dias">hace ${a.dias} días · ${AUD_LABEL[estado]}</span>`;
-  const frec = `<span class="frec">· ${a.frecuencia}${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
+  // Sin el "·" adelante: en pantalla ancha los separa el gap del flex, y en
+  // teléfono, cuando cae en su propio renglón, quedaba un punto suelto.
+  const frec = `<span class="frec">${a.frecuencia}${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
   const nota = a.nota ? `<span class="nota">${escapeHtml(a.nota)}</span>` : '';
   // El link puede venir de la celda (subida reciente, con el nota_url que
   // guarda setAuditoria_) o, para subidas de antes de tener ese campo,
@@ -1294,7 +1307,6 @@ function auditoriaHtml(a, carpetas){
           ${frec}
         </div>
         <div class="aud-acciones">
-          ${btnPredio}
           ${btnAuditoria}
           ${btnAbrirInforme}
           <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
