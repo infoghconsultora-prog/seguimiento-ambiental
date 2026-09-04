@@ -725,6 +725,7 @@ const ICONOS = {
   equis:'<path d="m4.4 4.4 7.2 7.2M11.6 4.4l-7.2 7.2"/>',
   doc:'<path d="M4 2.6h4.6L12 6v7.4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3.6a1 1 0 0 1 1-1Z"/><path d="M8.4 2.8V6H11.7"/>',
   carpeta:'<path d="M2.4 5.1a1.3 1.3 0 0 1 1.3-1.3h2.2l1.3 1.5h5.1a1.3 1.3 0 0 1 1.3 1.3v5.2a1.3 1.3 0 0 1-1.3 1.3H3.7a1.3 1.3 0 0 1-1.3-1.3z"/>',
+  carpetaAud:'<path d="M2.4 5.1a1.3 1.3 0 0 1 1.3-1.3h2.2l1.3 1.5h5.1a1.3 1.3 0 0 1 1.3 1.3v5.2a1.3 1.3 0 0 1-1.3 1.3H3.7a1.3 1.3 0 0 1-1.3-1.3z"/><path d="m6 9.3 1.4 1.4 2.8-2.9"/>',
   refrescar:'<path d="M3 8a5 5 0 0 1 8.5-3.5L13 6"/><path d="M13 2.5V6H9.5"/><path d="M13 8a5 5 0 0 1-8.5 3.5L3 10"/><path d="M3 13.5V10h3.5"/>',
   deshacer:'<path d="M3.4 7.6a5.2 5.2 0 1 1 1.3 4.2"/><path d="M2.6 3.9v3.9h3.9"/>',
   chevron:'<path d="m4.4 6.2 3.6 3.6 3.6-3.6"/>',
@@ -1258,8 +1259,6 @@ function auditoriaHtml(a, carpetas){
     ? `<a class="folder-btn" href="${escapeHtml(urlUltimoInforme)}" target="_blank" rel="noopener" title="Abrir el último informe subido" aria-label="Abrir el último informe subido">${ico('doc')}</a>` : '';
   const btnPredio = carpetas && carpetas.predio
     ? `<a class="folder-btn" href="${escapeHtml(carpetas.predio)}" target="_blank" rel="noopener" title="Carpeta Predio" aria-label="Carpeta Predio">${ico('carpeta')}</a>` : '';
-  const btnAuditoria = carpetas && carpetas.auditoria
-    ? `<a class="folder-btn" href="${escapeHtml(carpetas.auditoria)}" target="_blank" rel="noopener" title="Carpeta de auditorías ambientales" aria-label="Carpeta de auditorías ambientales">${ico('carpeta')}</a>` : '';
   return `
     <div class="auditoria ${estado}">
       <div class="aud-main">
@@ -1271,7 +1270,6 @@ function auditoriaHtml(a, carpetas){
         </div>
         <div class="aud-acciones">
           ${btnPredio}
-          ${btnAuditoria}
           ${btnAbrirInforme}
           <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
           ${a.ultima_subida ? `<button type="button" class="folder-btn btn-deshacer-aud"
@@ -1372,6 +1370,7 @@ function render(empresas){
         </div>
         <div class="company-summary">
           ${carpetas.carpeta ? `<a class="folder-btn" href="${escapeHtml(carpetas.carpeta)}" target="_blank" rel="noopener" title="Carpeta de la empresa en Drive" aria-label="Carpeta de la empresa en Drive">${ico('carpeta')}</a>` : ''}
+          ${carpetas.auditoria ? `<a class="folder-btn" href="${escapeHtml(carpetas.auditoria)}" target="_blank" rel="noopener" title="Carpeta de auditorías ambientales" aria-label="Carpeta de auditorías ambientales">${ico('carpetaAud')}</a>` : ''}
           <button type="button" class="folder-btn btn-actualizar-carpetas" title="Volver a buscar las carpetas de esta empresa" aria-label="Actualizar carpetas">${ico('refrescar')}</button>
           ${emp.pausada
             ? `<span class="badge gris"><span class="dot gris"></span>Servicio pausado</span>`
