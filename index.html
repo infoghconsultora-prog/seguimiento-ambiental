@@ -324,6 +324,9 @@
   .auditoria .dias{ font-size:15px; line-height:20px; opacity:.85; }
   .auditoria .frec{ font-size:13px; line-height:18px; opacity:.7; }
   .auditoria .nota{ font-size:13px; line-height:18px; opacity:.75; display:block; margin-top:6px; }
+  /* Cuando la nota es el link al informe subido, se ve clicable como el resto
+     de los documentos (doc-link), no atenuada como el texto plano. */
+  .auditoria .nota.doc-link{ opacity:1; display:inline-flex; margin-top:6px; }
   .auditoria button{ border:none; background:rgba(255,255,255,.22); color:inherit;
     padding:9px 16px; border-radius:var(--r-sm); font-size:15px; font-weight:600; cursor:pointer;
     white-space:nowrap; flex:0 0 auto; display:inline-flex; align-items:center; gap:7px;
@@ -1240,7 +1243,11 @@ function auditoriaHtml(a, carpetas){
   const dias = (a.dias === null || a.dias === undefined) ? '' :
     `<span class="dias">hace ${a.dias} días · ${AUD_LABEL[estado]}</span>`;
   const frec = `<span class="frec">· ${a.frecuencia}${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
-  const nota = a.nota ? `<span class="nota">${escapeHtml(a.nota)}</span>` : '';
+  const nota = a.nota
+    ? (a.nota_url
+        ? `<a class="nota doc-link" href="${escapeHtml(a.nota_url)}" target="_blank" rel="noopener">${ico('doc')}${escapeHtml(a.nota)}</a>`
+        : `<span class="nota">${escapeHtml(a.nota)}</span>`)
+    : '';
   const btnPredio = carpetas && carpetas.predio
     ? `<a class="folder-btn" href="${escapeHtml(carpetas.predio)}" target="_blank" rel="noopener" title="Carpeta Predio" aria-label="Carpeta Predio">${ico('carpeta')}</a>` : '';
   const btnAuditoria = carpetas && carpetas.auditoria
@@ -1699,7 +1706,7 @@ function render(empresas){
           if(!r.ok){ aviso('No se pudo subir: ' + (r.detalle || r.error)); return; }
           aviso(file.name);
           // La subida vale como auditoría hecha: se registra la fecha de hoy.
-          llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: file.name })
+          llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: file.name, url: r.url })
             .then(()=> cargarDatos()).catch(()=>{});
           strip.className = 'auditoria verde';
           strip.querySelector('.fecha').textContent = fmtFecha(new Date().toISOString().slice(0,10));
