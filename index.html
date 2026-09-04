@@ -348,6 +348,14 @@
   .company.paused .auditoria{ background:var(--gris) !important; color:#fff !important; }
   .company.paused .btn-pausa{ background:color-mix(in srgb,var(--accent) 15%,transparent); color:var(--accent-ink); }
 
+  /* Aviso breve cuando entran cambios hechos por otra persona. */
+  #toastSync{ position:fixed; left:50%; bottom:24px; transform:translate(-50%,14px);
+    background:var(--label); color:var(--bg); font-size:13.5px; font-weight:600;
+    padding:10px 18px; border-radius:var(--r-pill); box-shadow:0 8px 24px rgba(0,0,0,.22);
+    opacity:0; pointer-events:none; transition:opacity .25s var(--ease), transform .25s var(--ease);
+    z-index:60; }
+  #toastSync.on{ opacity:1; transform:translate(-50%,0); }
+
   /* ---------- hoja modal, al modo de una sheet de iOS ---------- */
   #modalOverlay{ display:none; position:fixed; inset:0; background:rgba(20,23,15,.42);
     -webkit-backdrop-filter:blur(10px) saturate(140%); backdrop-filter:blur(10px) saturate(140%);
@@ -528,6 +536,8 @@
   <div id="companies"></div>
 </main>
 
+<div id="toastSync">Datos actualizados</div>
+
 <div id="modalOverlay">
   <div id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
     <div id="modalHead">
@@ -685,8 +695,10 @@ function intentarLogin(primerIntento){
       detenerCargaVisual();
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('dashboardScreen').style.display = 'block';
+      versionVista = data.version || null;
       arrancar({ generado: data.generado, empresas: data.empresas });
       aplicarAsignacionDeUrl();
+      arrancarSync();  // de acá en más, lo que cambie otra persona llega solo
       cargarLogos();   // decorativos: llegan después, sin frenar el panel
     });
   }).catch(()=>{
@@ -754,6 +766,9 @@ function cargarDatos(){
   return llamarBackend('getData', {}).then(data=>{
     if(data.ok){
       EQUIPO = data.equipo || [];
+      // La versión viene con los datos: así el ciclo de sincronización no
+      // vuelve a bajar todo por el cambio que acaba de hacer esta persona.
+      if(data.version) versionVista = data.version;
       // getData ya no trae los logos: se conservan los que ya estén en pantalla
       // para que no desaparezcan al actualizar.
       const previos = {};
@@ -1188,12 +1203,12 @@ function tileHtml(it){
   if(it.deuda) extra.push(`<div><b>Deuda:</b> ${escapeHtml(it.deuda)}</div>`);
   extra.push(
     `<div><b>Estado</b>
-       <textarea class="obs-edit" placeholder="Sin estado cargado. Escribí acá para actualizar...">${escapeHtml(it.estado_texto || '')}</textarea>
+       <textarea class="obs-edit" data-campo="estado" placeholder="Sin estado cargado. Escribí acá para actualizar...">${escapeHtml(it.estado_texto || '')}</textarea>
        <div class="obs-guardado">Guardado</div>
      </div>`);
   extra.push(
     `<div><b>Observaciones</b>
-       <textarea class="obs-edit" placeholder="Sin observaciones. Escribí acá para agregar...">${escapeHtml(it.observaciones || '')}</textarea>
+       <textarea class="obs-edit" data-campo="observaciones" placeholder="Sin observaciones. Escribí acá para agregar...">${escapeHtml(it.observaciones || '')}</textarea>
        <div class="obs-guardado">Guardado</div>
      </div>`);
 
@@ -1273,6 +1288,17 @@ function render(empresas){
   });
 
   const cont = document.getElementById('companies');
+  // Un refresco automático no tiene que cerrarle a nadie lo que tenía abierto
+  // ni saltarle el scroll: se anota qué empresas tenían desplegado
+  // "Municipalidad y bomberos" / "Info adicional" y se restituye al redibujar.
+  const abiertas = { n2:new Set(), n3:new Set() };
+  cont.querySelectorAll('.company').forEach(c=>{
+    const nom = c.dataset.empresa;
+    if(!nom) return;
+    if(c.classList.contains('show-n2')) abiertas.n2.add(nom);
+    if(c.classList.contains('show-n3')) abiertas.n3.add(nom);
+  });
+  const scrollPrevio = window.scrollY;
   cont.innerHTML = '';
 
   empresas.forEach(emp=>{
@@ -1316,7 +1342,10 @@ function render(empresas){
       : 'Al día';
 
     const card = document.createElement('div');
-    card.className = 'company';
+    card.className = 'company' + (emp.pausada ? ' paused' : '')
+      + (abiertas.n2.has(emp.empresa) ? ' show-n2' : '')
+      + (abiertas.n3.has(emp.empresa) ? ' show-n3' : '');
+    card.dataset.empresa = emp.empresa;
     card.innerHTML = `
       <div class="company-head">
         <div class="company-title">
@@ -1328,14 +1357,18 @@ function render(empresas){
         <div class="company-summary">
           ${carpetas.carpeta ? `<a class="folder-btn" href="${escapeHtml(carpetas.carpeta)}" target="_blank" rel="noopener" title="Carpeta de la empresa en Drive" aria-label="Carpeta de la empresa en Drive">${ico('carpeta')}</a>` : ''}
           <button type="button" class="folder-btn btn-actualizar-carpetas" title="Volver a buscar las carpetas de esta empresa" aria-label="Actualizar carpetas">${ico('refrescar')}</button>
-          <span class="badge ${peor}"><span class="dot ${peor}"></span>${badgeLabel}</span>
+          ${emp.pausada
+            ? `<span class="badge gris"><span class="dot gris"></span>Servicio pausado</span>`
+            : `<span class="badge ${peor}"><span class="dot ${peor}"></span>${badgeLabel}</span>`}
         </div>
       </div>
       <div class="company-body">${gruposHtml}</div>
       <div class="toggles">
         <button class="toggle-btn btn-n2" type="button">Municipalidad y bomberos <span class="chev">${ico('chevron')}</span></button>
         <button class="toggle-btn btn-n3" type="button">Info adicional <span class="chev">${ico('chevron')}</span></button>
-        <button class="btn-pausa" type="button">${ico('pausa')} Pausar servicio</button>
+        <button class="btn-pausa" type="button">${emp.pausada
+          ? ico('play') + ' Reanudar servicio'
+          : ico('pausa') + ' Pausar servicio'}</button>
       </div>
       <div class="nivel2">${n2Html}</div>
       <div class="nivel3">
@@ -1359,6 +1392,8 @@ function render(empresas){
       card.classList.toggle('show-n3');
       card.querySelector('.btn-n3').classList.toggle('active');
     });
+    if(card.classList.contains('show-n2')) card.querySelector('.btn-n2').classList.add('active');
+    if(card.classList.contains('show-n3')) card.querySelector('.btn-n3').classList.add('active');
 
     // Vuelve a buscar Predio/Transporte/Hidráulica/Auditorías de esta
     // empresa por si le crearon o renombraron carpetas en Drive.
@@ -1579,32 +1614,53 @@ function render(empresas){
       });
     });
 
-    // Pausa del servicio: deja toda la tarjeta en gris.
+    // Pausa del servicio: deja toda la tarjeta en gris. Se guarda en la
+    // columna SERVICIO PAUSADO de la planilla, así sobrevive a cerrar el
+    // panel y la ven todos, no solo quien la pausó.
     const btnPausa = card.querySelector('.btn-pausa');
     btnPausa.addEventListener('click', ()=>{
-      const pausada = card.classList.toggle('paused');
-      btnPausa.innerHTML = pausada ? ico('play') + ' Reanudar servicio' : ico('pausa') + ' Pausar servicio';
-      const badge = card.querySelector('.company-summary .badge');
-      if(pausada){
-        badge.dataset.prev = badge.className + '|' + badge.innerHTML;
-        badge.className = 'badge gris';
-        badge.innerHTML = '<span class="dot gris"></span>Servicio pausado';
-      } else if(badge.dataset.prev){
-        const [cls, html] = badge.dataset.prev.split('|');
-        badge.className = cls; badge.innerHTML = html;
-      }
+      const pausada = !emp.pausada;
+      btnPausa.disabled = true;
+      llamarBackend('setPausa', { empresa: emp.empresa, pausada }).then(r=>{
+        if(r.ok){
+          emp.pausada = pausada;   // aplicar() vuelve a dibujar la tarjeta
+          aplicar();
+        } else {
+          btnPausa.disabled = false;
+          btnPausa.title = 'No se pudo guardar, probá de nuevo';
+        }
+      }).catch(()=>{
+        btnPausa.disabled = false;
+        btnPausa.title = 'No se pudo guardar, probá de nuevo';
+      });
     });
 
-    // Observaciones editables (mockup: solo memoria del navegador).
+    // Estado y observaciones: se escriben en la planilla, en la fila de esa
+    // habilitación. Va con un respiro de 900 ms para no mandar una consulta
+    // por tecla, y el cartelito solo dice "Guardado" cuando el backend
+    // confirmó — antes aparecía siempre, aunque no se guardara nada.
     card.querySelectorAll('.obs-edit').forEach(ta=>{
       const aviso = ta.parentElement.querySelector('.obs-guardado');
+      const it = itemDeTile(emp, ta.closest('.tile'));
+      const campo = ta.dataset.campo;
+      if(!it || !campo) return;
       let t;
       ta.addEventListener('input', ()=>{
         clearTimeout(t);
         t = setTimeout(()=>{
+          const valor = ta.value;
+          aviso.textContent = 'Guardando…';
           aviso.classList.add('on');
-          setTimeout(()=> aviso.classList.remove('on'), 1600);
-        }, 600);
+          llamarBackend('setCampo', { fila: it.fila, campo, valor }).then(r=>{
+            if(r.ok){
+              if(campo === 'estado') it.estado_texto = valor; else it.observaciones = valor;
+              aviso.textContent = 'Guardado';
+              setTimeout(()=> aviso.classList.remove('on'), 1600);
+            } else {
+              aviso.textContent = 'No se pudo guardar';
+            }
+          }).catch(()=>{ aviso.textContent = 'No se pudo guardar'; });
+        }, 900);
       });
     });
 
@@ -1676,6 +1732,70 @@ function render(empresas){
 
     cont.appendChild(card);
   });
+
+  // Después de redibujar, la página vuelve a donde estaba. Sin esto, un
+  // refresco automático te manda al principio de la lista mientras estás
+  // mirando una empresa del final.
+  if(scrollPrevio) window.scrollTo(0, scrollPrevio);
+}
+
+/* ---------------- sincronización entre usuarios ----------------
+ * Apps Script no permite mantener una conexión abierta, así que no existe el
+ * "tiempo real" de un Google Docs (ver el cursor del otro mientras escribe).
+ * Lo más cercano, y alcanza de sobra para este panel, es preguntar seguido:
+ * cada 20 s cada panel abierto consulta si cambió algo. Esa consulta NO lee
+ * las planillas — el backend responde con una huella (contador de cambios +
+ * fecha de modificación de cada planilla), así que es barata y se puede hacer
+ * todo el día sin comerse la cuota diaria de Apps Script. Recién cuando la
+ * huella cambia se baja la información de verdad.
+ *
+ * Resultado: lo que sube o edita una persona le aparece a las demás en menos
+ * de medio minuto, sin que nadie tenga que recargar la página.
+ */
+const INTERVALO_SYNC = 20000;
+let versionVista = null;
+let syncEnCurso = false;
+let syncIntervalo = null;
+
+// No se refresca por debajo de las manos de nadie: si alguien está tipeando
+// en un campo o tiene abierta la hoja de pendientes, espera al próximo ciclo.
+function panelOcupado(){
+  const a = document.activeElement;
+  if(a && a.closest && a.closest('#companies') &&
+     (a.isContentEditable || a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')) return true;
+  const ov = document.getElementById('modalOverlay');
+  if(ov && ov.classList.contains('on')) return true;
+  return false;
+}
+
+function chequearVersion(){
+  if(document.hidden || syncEnCurso || !idToken) return Promise.resolve();
+  syncEnCurso = true;
+  return llamarBackend('getVersion', {}).then(r=>{
+    if(!r || !r.ok) return;
+    if(versionVista === null){ versionVista = r.version; return; }
+    if(r.version === versionVista) return;
+    if(panelOcupado()) return;   // sin tocar la versión: reintenta en 20 s
+    versionVista = r.version;
+    return cargarDatos().then(()=> avisarActualizado());
+  }).catch(()=>{}).then(()=>{ syncEnCurso = false; });
+}
+
+function avisarActualizado(){
+  const t = document.getElementById('toastSync');
+  if(!t) return;
+  t.classList.add('on');
+  clearTimeout(avisarActualizado.t);
+  avisarActualizado.t = setTimeout(()=> t.classList.remove('on'), 2600);
+}
+
+function arrancarSync(){
+  clearInterval(syncIntervalo);
+  syncIntervalo = setInterval(chequearVersion, INTERVALO_SYNC);
+  // Volver a la pestaña es justo cuando es más probable estar mirando datos
+  // viejos, así que ahí se chequea al toque sin esperar el ciclo.
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) chequearVersion(); });
+  window.addEventListener('focus', chequearVersion);
 }
 </script>
 </body>
