@@ -1244,6 +1244,33 @@ function tileHtml(it){
 }
 
 function auditoriaHtml(a, carpetas){
+  const btnPredio = carpetas && carpetas.predio
+    ? `<a class="folder-btn" href="${escapeHtml(carpetas.predio)}" target="_blank" rel="noopener" title="Carpeta Predio" aria-label="Carpeta Predio">${ico('carpeta')}</a>` : '';
+  const btnAuditoria = carpetas && carpetas.auditoria
+    ? `<a class="folder-btn" href="${escapeHtml(carpetas.auditoria)}" target="_blank" rel="noopener" title="Carpeta de auditorías ambientales" aria-label="Carpeta de auditorías ambientales">${ico('carpetaAud')}</a>` : '';
+
+  // Empresas que no figuran en la planilla de visitas técnicas: no tienen
+  // fecha ni ciclo, pero sí tienen carpeta de auditorías. La franja se dibuja
+  // igual, en gris, para que el acceso a la carpeta esté siempre en el mismo
+  // lugar en las 24 tarjetas. Sin botón de subir: no hay fila donde anotar la
+  // fecha, así que subir un informe fallaría.
+  if(!a){
+    return `
+      <div class="auditoria gris">
+        <div class="aud-main">
+          <div class="info">
+            <span class="k">Auditoría ambiental</span>
+            <span class="fecha">Sin visitas registradas</span>
+          </div>
+          <div class="aud-acciones">
+            ${btnPredio}
+            ${btnAuditoria}
+          </div>
+        </div>
+        <span class="nota">No figura en la planilla de visitas técnicas. Agregala ahí para hacerle seguimiento.</span>
+      </div>`;
+  }
+
   const estado = a.estado;
   const fecha = a.ultima ? fmtFecha(a.ultima) : 'Sin registrar';
   const dias = (a.dias === null || a.dias === undefined) ? '' :
@@ -1257,8 +1284,6 @@ function auditoriaHtml(a, carpetas){
   const urlUltimoInforme = a.nota_url || (a.ultima_subida && a.ultima_subida.url) || null;
   const btnAbrirInforme = urlUltimoInforme
     ? `<a class="folder-btn" href="${escapeHtml(urlUltimoInforme)}" target="_blank" rel="noopener" title="Abrir el último informe subido" aria-label="Abrir el último informe subido">${ico('doc')}</a>` : '';
-  const btnPredio = carpetas && carpetas.predio
-    ? `<a class="folder-btn" href="${escapeHtml(carpetas.predio)}" target="_blank" rel="noopener" title="Carpeta Predio" aria-label="Carpeta Predio">${ico('carpeta')}</a>` : '';
   return `
     <div class="auditoria ${estado}">
       <div class="aud-main">
@@ -1270,6 +1295,7 @@ function auditoriaHtml(a, carpetas){
         </div>
         <div class="aud-acciones">
           ${btnPredio}
+          ${btnAuditoria}
           ${btnAbrirInforme}
           <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
           ${a.ultima_subida ? `<button type="button" class="folder-btn btn-deshacer-aud"
@@ -1370,7 +1396,6 @@ function render(empresas){
         </div>
         <div class="company-summary">
           ${carpetas.carpeta ? `<a class="folder-btn" href="${escapeHtml(carpetas.carpeta)}" target="_blank" rel="noopener" title="Carpeta de la empresa en Drive" aria-label="Carpeta de la empresa en Drive">${ico('carpeta')}</a>` : ''}
-          ${carpetas.auditoria ? `<a class="folder-btn" href="${escapeHtml(carpetas.auditoria)}" target="_blank" rel="noopener" title="Carpeta de auditorías ambientales" aria-label="Carpeta de auditorías ambientales">${ico('carpetaAud')}</a>` : ''}
           <button type="button" class="folder-btn btn-actualizar-carpetas" title="Volver a buscar las carpetas de esta empresa" aria-label="Actualizar carpetas">${ico('refrescar')}</button>
           ${emp.pausada
             ? `<span class="badge gris"><span class="dot gris"></span>Servicio pausado</span>`
@@ -1396,7 +1421,7 @@ function render(empresas){
             <div class="pista">Enter para guardar · Esc para cancelar</div></div>
         </div>
       </div>
-      ${emp.auditoria ? auditoriaHtml(emp.auditoria, carpetas) : ''}
+      ${auditoriaHtml(emp.auditoria, carpetas)}
     `;
 
     card.querySelector('.btn-n2').addEventListener('click', ()=>{
@@ -1703,7 +1728,10 @@ function render(empresas){
     // auditorías de la empresa), así que no hay lista que elegir. Subirlo
     // también registra la fecha y pone la franja en verde.
     const strip = card.querySelector('.auditoria');
-    if(strip){
+    // Las empresas que no están en la planilla de visitas tienen franja pero
+    // no botón de subir: sin este chequeo, el addEventListener sobre null
+    // rompía el armado de toda la tarjeta.
+    if(strip && strip.querySelector('.btn-subir')){
       const input = strip.querySelector('.file-input');
       const btnSubir = strip.querySelector('.btn-subir');
       btnSubir.addEventListener('click', ()=> input.click());
