@@ -324,9 +324,6 @@
   .auditoria .dias{ font-size:15px; line-height:20px; opacity:.85; }
   .auditoria .frec{ font-size:13px; line-height:18px; opacity:.7; }
   .auditoria .nota{ font-size:13px; line-height:18px; opacity:.75; display:block; margin-top:6px; }
-  /* Cuando la nota es el link al informe subido, se ve clicable como el resto
-     de los documentos (doc-link), no atenuada como el texto plano. */
-  .auditoria .nota.doc-link{ opacity:1; display:inline-flex; margin-top:6px; }
   .auditoria button{ border:none; background:rgba(255,255,255,.22); color:inherit;
     padding:9px 16px; border-radius:var(--r-sm); font-size:15px; font-weight:600; cursor:pointer;
     white-space:nowrap; flex:0 0 auto; display:inline-flex; align-items:center; gap:7px;
@@ -1243,11 +1240,14 @@ function auditoriaHtml(a, carpetas){
   const dias = (a.dias === null || a.dias === undefined) ? '' :
     `<span class="dias">hace ${a.dias} días · ${AUD_LABEL[estado]}</span>`;
   const frec = `<span class="frec">· ${a.frecuencia}${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
-  const nota = a.nota
-    ? (a.nota_url
-        ? `<a class="nota doc-link" href="${escapeHtml(a.nota_url)}" target="_blank" rel="noopener">${ico('doc')}${escapeHtml(a.nota)}</a>`
-        : `<span class="nota">${escapeHtml(a.nota)}</span>`)
-    : '';
+  const nota = a.nota ? `<span class="nota">${escapeHtml(a.nota)}</span>` : '';
+  // El link puede venir de la celda (subida reciente, con el nota_url que
+  // guarda setAuditoria_) o, para subidas de antes de tener ese campo,
+  // del registro de "última subida" que sí conserva el id de Drive. Así el
+  // botón abre el último informe sin importar cuándo se subió.
+  const urlUltimoInforme = a.nota_url || (a.ultima_subida && a.ultima_subida.url) || null;
+  const btnAbrirInforme = urlUltimoInforme
+    ? `<a class="folder-btn" href="${escapeHtml(urlUltimoInforme)}" target="_blank" rel="noopener" title="Abrir el último informe subido" aria-label="Abrir el último informe subido">${ico('doc')}</a>` : '';
   const btnPredio = carpetas && carpetas.predio
     ? `<a class="folder-btn" href="${escapeHtml(carpetas.predio)}" target="_blank" rel="noopener" title="Carpeta Predio" aria-label="Carpeta Predio">${ico('carpeta')}</a>` : '';
   const btnAuditoria = carpetas && carpetas.auditoria
@@ -1264,6 +1264,7 @@ function auditoriaHtml(a, carpetas){
         <div class="aud-acciones">
           ${btnPredio}
           ${btnAuditoria}
+          ${btnAbrirInforme}
           <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
           ${a.ultima_subida ? `<button type="button" class="folder-btn btn-deshacer-aud"
              title="Deshacer la subida de «${escapeHtml(a.ultima_subida.nombre)}» y volver a la fecha anterior"
