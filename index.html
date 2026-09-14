@@ -469,6 +469,10 @@
     transition:opacity .3s var(--ease); min-height:18px; }
   #loginError{ display:none; font-size:15px; line-height:20px; color:var(--rojo); font-weight:600;
     margin-top:14px; background:var(--rojo-bg); border-radius:var(--r-sm); padding:12px 14px; }
+  #loginError button{ display:block; margin:10px auto 0; border:none; cursor:pointer;
+    background:var(--rojo); color:#fff; font-size:14px; font-weight:600;
+    border-radius:var(--r-pill); padding:8px 18px; }
+  #loginError button:active{ transform:scale(.96); }
   .account{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--label-2); }
   .account b{ color:var(--accent-ink); font-weight:600; }
   .account button{ border:none; background:var(--gray-5); color:var(--label-2); cursor:pointer;
@@ -628,14 +632,40 @@ function subirAlBackend(file, extra){
 // Con un corte propio, falla rápido y con un mensaje, en vez de quedarse.
 const MS_ESPERA_BACKEND = 25000;
 
-function llamarBackend(action, extra){
+// Acciones que se pueden repetir sin consecuencias. Una escritura repetida
+// podría duplicar el cambio, así que esas no se reintentan nunca.
+const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1 };
+
+function llamarBackend(action, extra, esReintento){
   const corte = new AbortController();
   const reloj = setTimeout(()=> corte.abort(), MS_ESPERA_BACKEND);
+
   return fetch(BACKEND_URL, {
     method:'POST',
     body: JSON.stringify(Object.assign({ action, idToken }, extra || {})),
     signal: corte.signal
-  }).then(r => r.json()).finally(()=> clearTimeout(reloj));
+  })
+  .then(r => r.text())
+  .then(txt => {
+    try { return JSON.parse(txt); }
+    catch(e){
+      // Apps Script a veces responde con su propia página de error en HTML
+      // ("No se pudo abrir el archivo en este momento") en lugar de la
+      // respuesta. Antes eso explotaba dentro de r.json() y llegaba al panel
+      // como si fuera un problema de red, sin forma de distinguirlo.
+      const err = new Error('El backend respondió algo que no es JSON');
+      err.name = 'RespuestaInvalida';
+      throw err;
+    }
+  })
+  .finally(()=> clearTimeout(reloj))
+  .catch(err => {
+    if(!esReintento && ACCIONES_LECTURA[action] && err.name !== 'AbortError'){
+      return new Promise(r => setTimeout(r, 900))
+        .then(()=> llamarBackend(action, extra, true));
+    }
+    throw err;
+  });
 }
 
 window.onload = function(){
@@ -717,13 +747,27 @@ function intentarLogin(primerIntento){
     arrancarSync();       // de acá en más, lo que cambie otra persona llega solo
     cargarLogos();        // decorativos: llegan después, sin frenar el panel
     refrescarCarpetas();  // ídem: completa los botones de Drive que falten
-  }).catch(()=>{
-    if(primerIntento) return intentarLogin(false);
+  }).catch(fallo=>{
+    // llamarBackend ya reintentó solo una vez, así que acá no se vuelve a
+    // reintentar: sumar vueltas solo alarga la espera sin cambiar el resultado.
     detenerCargaVisual();
     document.getElementById('gsiButton').style.display = 'block';
     const err = document.getElementById('loginError');
-    err.textContent = 'No se pudo conectar con el backend. Probá de nuevo en un momento.';
+    const causa = (fallo && fallo.name === 'AbortError')
+      ? 'El backend tardó demasiado en responder.'
+      : (fallo && fallo.name === 'RespuestaInvalida')
+        ? 'Google devolvió una respuesta inesperada.'
+        : 'No se pudo conectar con el backend.';
+    err.innerHTML = `${escapeHtml(causa)} Casi siempre se arregla recargando la página
+      con la versión más nueva.
+      <button type="button" id="btnRecargarLimpio">Recargar</button>`;
     err.style.display = 'block';
+    // Recarga salteando la copia guardada del navegador: GitHub Pages guarda
+    // la página 10 minutos, así que después de una actualización el navegador
+    // puede seguir usando la versión vieja y fallar por algo ya arreglado.
+    document.getElementById('btnRecargarLimpio').addEventListener('click', ()=>{
+      location.replace(location.pathname + '?recargar=' + Date.now());
+    });
   });
 }
 
