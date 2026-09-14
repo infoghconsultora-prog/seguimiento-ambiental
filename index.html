@@ -355,15 +355,18 @@
     opacity:0; pointer-events:none; transition:opacity .25s var(--ease), transform .25s var(--ease);
     z-index:60; }
   #toastSync.on{ opacity:1; transform:translate(-50%,0); }
-  /* A diferencia del toast, este no se cierra solo: la sesión sigue vencida
-     hasta que la persona recarga, así que se queda a la vista. */
-  #bannerSesion{ display:none; position:fixed; left:0; right:0; top:0; z-index:70;
-    background:var(--rojo); color:#fff; font-size:14px; font-weight:600;
+  /* A diferencia del toast, ninguno de los dos se cierra solo: la condición
+     sigue ahí hasta que la persona recarga, así que se quedan a la vista. */
+  .banner-fijo{ display:none; position:fixed; left:0; right:0; top:0; z-index:70;
+    color:#fff; font-size:14px; font-weight:600;
     padding:10px 16px; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; }
-  #bannerSesion.on{ display:flex; }
-  #bannerSesion button{ border:none; cursor:pointer; background:rgba(255,255,255,.22);
+  .banner-fijo.on{ display:flex; }
+  .banner-fijo button{ border:none; cursor:pointer; background:rgba(255,255,255,.22);
     color:#fff; font-size:13px; font-weight:700; border-radius:var(--r-pill); padding:6px 14px; }
-  #bannerSesion button:hover{ background:rgba(255,255,255,.32); }
+  .banner-fijo button:hover{ background:rgba(255,255,255,.32); }
+  #bannerSesion{ background:var(--rojo); }
+  /* el de version es informativo, no un error: color mas neutro que el rojo */
+  #bannerVersion{ background:var(--accent-ink); }
 
   /* ---------- hoja modal, al modo de una sheet de iOS ---------- */
   #modalOverlay{ display:none; position:fixed; inset:0; background:rgba(20,23,15,.42);
@@ -562,9 +565,14 @@
 
 <div id="toastSync">Datos actualizados</div>
 
-<div id="bannerSesion">
+<div id="bannerSesion" class="banner-fijo">
   <span>Tu sesión venció. Volvé a entrar para seguir viendo cambios nuevos.</span>
   <button type="button" id="btnRecargarSesion">Recargar</button>
+</div>
+
+<div id="bannerVersion" class="banner-fijo">
+  <span>Hay una versión más nueva del panel. Recargá para tenerla.</span>
+  <button type="button" id="btnRecargarVersion">Recargar</button>
 </div>
 
 <div id="modalOverlay">
@@ -593,6 +601,13 @@
    --------------------------------------------------------------- */
 const CLIENT_ID  = '397447072902-nhbl4at1hhd41igam0hbq7p2kc0gt8up.apps.googleusercontent.com';
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k2o2gI_oDSOlDrkQs7PbMDNRvDEUR6ajoAhABSNVuCmHi9PpDNw/exec';
+
+// Se pisa a mano en cada publish (fecha UTC del momento de publicar). Sirve
+// para que una pestaña vieja se entere sola de que hay una versión más
+// nueva, en vez de quedarse corriendo el código con el que cargó para
+// siempre — el mismo problema que causó el enjambre de sesiones vencidas del
+// 14/09: un arreglo desplegado no le llega a nadie que no recargue.
+const FRONTEND_VERSION = '2026-09-14T15:07';
 
 let idToken = null;
 
@@ -1993,6 +2008,38 @@ function planillaCambio(r){
 }
 
 document.getElementById('btnRecargarSesion').addEventListener('click', ()=> location.reload());
+document.getElementById('btnRecargarVersion').addEventListener('click', ()=> location.reload());
+
+/* --------------------- detectar una versión más nueva ---------------------
+ * Publicar un arreglo no lo aplica solo a quien ya tenía el panel abierto:
+ * el JS que corre en esa pestaña es el que cargó, y sigue siendo el viejo
+ * hasta que la persona recarga. Esto fue justo lo que pasó con el enjambre
+ * de sesiones vencidas del 14/09 — el arreglo de backend ya estaba en vivo,
+ * pero las pestañas que ya estaban abiertas lo seguían golpeando con el
+ * código de sondeo viejo. Ahora el panel se fija solo, sin que nadie tenga
+ * que acordarse de avisar "recargá que subí algo nuevo".
+ *
+ * No pega contra el backend (Apps Script): es un GET liviano a la misma
+ * página en GitHub Pages, así que no compite por el mismo cupo que getData.
+ */
+const MS_CHEQUEO_VERSION_FRONTEND = 5 * 60 * 1000;   // cada 5 min alcanza sobra
+
+function chequearVersionFrontend(){
+  if(document.hidden) return;
+  fetch(location.pathname + '?_v=' + Date.now(), { cache:'no-store' })
+    .then(r => r.text())
+    .then(txt => {
+      const m = txt.match(/FRONTEND_VERSION\s*=\s*'([^']+)'/);
+      if(m && m[1] !== FRONTEND_VERSION){
+        clearInterval(intervaloVersionFrontend);
+        document.getElementById('bannerVersion').classList.add('on');
+      }
+    })
+    .catch(()=>{});   // sin internet momentaneo: no pasa nada, se reintenta
+}
+
+let intervaloVersionFrontend = setInterval(chequearVersionFrontend, MS_CHEQUEO_VERSION_FRONTEND);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) chequearVersionFrontend(); });
 
 function arrancarSync(){
   clearInterval(syncIntervalo);
