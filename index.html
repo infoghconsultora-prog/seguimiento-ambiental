@@ -624,11 +624,18 @@ function subirAlBackend(file, extra){
   });
 }
 
+// Un pedido que se cuelga dejaba la pantalla de carga girando para siempre.
+// Con un corte propio, falla rápido y con un mensaje, en vez de quedarse.
+const MS_ESPERA_BACKEND = 25000;
+
 function llamarBackend(action, extra){
+  const corte = new AbortController();
+  const reloj = setTimeout(()=> corte.abort(), MS_ESPERA_BACKEND);
   return fetch(BACKEND_URL, {
     method:'POST',
-    body: JSON.stringify(Object.assign({ action, idToken }, extra || {}))
-  }).then(r => r.json());
+    body: JSON.stringify(Object.assign({ action, idToken }, extra || {})),
+    signal: corte.signal
+  }).then(r => r.json()).finally(()=> clearTimeout(reloj));
 }
 
 window.onload = function(){
@@ -694,24 +701,22 @@ function intentarLogin(primerIntento){
       err.style.display = 'block';
       return;
     }
-    // Las carpetas de Drive se esperan acá tambien (no solo los datos de la
-    // planilla) para que el panel ya aparezca completo, sin "No tengo la
-    // carpeta" hasta que termine un fetch en segundo plano.
-    return llamarBackend('getCarpetas', {}).then(cData=>{
-      const carpetas = cData.ok ? cData.carpetas : {};
-      data.empresas.forEach(emp=>{ emp.carpetas = carpetas[emp.empresa] || null; });
-
-      document.getElementById('accountEmail').textContent = data.email;
-      EQUIPO = data.equipo || [];
-      detenerCargaVisual();
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('dashboardScreen').style.display = 'block';
-      versionVista = data.version || null;
-      arrancar({ generado: data.generado, empresas: data.empresas });
-      aplicarAsignacionDeUrl();
-      arrancarSync();  // de acá en más, lo que cambie otra persona llega solo
-      cargarLogos();   // decorativos: llegan después, sin frenar el panel
-    });
+    // El panel abre apenas llegan los datos de la planilla. getCarpetas NO se
+    // espera: cuando a alguna empresa todavía no se le recorrió Drive puede
+    // tardar, y esperarlo hacía que entrar dependiera de eso — si se cortaba,
+    // no se entraba. getData ya trae las carpetas que están guardadas, así que
+    // los botones aparecen desde el arranque y los que falten se suman solos.
+    document.getElementById('accountEmail').textContent = data.email;
+    EQUIPO = data.equipo || [];
+    detenerCargaVisual();
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
+    versionVista = data.version || null;
+    arrancar({ generado: data.generado, empresas: data.empresas });
+    aplicarAsignacionDeUrl();
+    arrancarSync();       // de acá en más, lo que cambie otra persona llega solo
+    cargarLogos();        // decorativos: llegan después, sin frenar el panel
+    refrescarCarpetas();  // ídem: completa los botones de Drive que falten
   }).catch(()=>{
     if(primerIntento) return intentarLogin(false);
     detenerCargaVisual();
@@ -814,6 +819,26 @@ function cargarLogos(){
     if(alguno) aplicar();
     return data;
   }).catch(()=>{});   // sin logos el panel funciona igual
+}
+
+// Pide las carpetas de Drive sin frenar nada. Si el backend avisa que todavía
+// le quedan empresas por recorrer, vuelve a pedir hasta completarlas: cada
+// pedido avanza un poco y lo que avanzó queda guardado del lado del servidor.
+function refrescarCarpetas(vuelta){
+  vuelta = vuelta || 0;
+  return llamarBackend('getCarpetas', {}).then(cData=>{
+    if(!cData.ok || !window.PAYLOAD) return;
+    let cambio = false;
+    window.PAYLOAD.empresas.forEach(emp=>{
+      const nueva = cData.carpetas[emp.empresa] || null;
+      if(JSON.stringify(nueva) !== JSON.stringify(emp.carpetas)){
+        emp.carpetas = nueva;
+        cambio = true;
+      }
+    });
+    if(cambio) aplicar();
+    if(!cData.completo && vuelta < 8) return refrescarCarpetas(vuelta + 1);
+  }).catch(()=>{});   // sin carpetas el panel funciona igual
 }
 
 function arrancar(payload){
