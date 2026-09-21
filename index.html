@@ -263,6 +263,22 @@
   .fechas-renovacion button{ border:none; background:var(--accent); color:#fff; font-weight:600;
     font-size:12.5px; padding:6px 12px; border-radius:var(--r-pill); cursor:pointer; }
   .fechas-renovacion button:disabled{ opacity:.5; cursor:default; }
+  .fechas-renovacion button.sec{ background:var(--gray-5); color:var(--label-2); }
+  .tile-venc.editable{ cursor:pointer; }
+  .tile-venc.editable:hover{ filter:brightness(.95); text-decoration:underline; }
+  .aud-nueva{ margin:10px 0 0; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
+    background:var(--verde-bg); border-radius:var(--r-sm); padding:10px 12px; }
+  .aud-nueva > .linea{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .aud-nueva .linea .sec, .aud-nueva .cerrar{ border:none; background:rgba(0,0,0,.07); color:inherit;
+    border-radius:var(--r-pill); padding:4px 11px; font-size:12px; font-weight:600; cursor:pointer; margin-left:auto; }
+  .lista-informes{ margin-top:8px; max-height:240px; overflow:auto; display:flex; flex-direction:column; gap:4px; }
+  .informe-item{ display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left;
+    border:none; background:var(--surface); color:var(--label); font:inherit; font-weight:600; font-size:13px;
+    padding:8px 10px; border-radius:var(--r-sm); cursor:pointer; }
+  .informe-item:hover{ background:color-mix(in srgb,var(--accent) 14%,var(--surface)); }
+  .informe-item:disabled{ opacity:.6; cursor:default; }
+  .informe-item .inf-nombre{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .informe-item .inf-meta{ flex:0 0 auto; font-weight:400; font-size:12px; color:var(--label-2); }
   .fechas-renovacion .fechas-guardado{ font-size:12px; color:var(--accent-ink); font-weight:600;
     opacity:0; transition:opacity .2s var(--ease); }
   .fechas-renovacion .fechas-guardado.on{ opacity:1; }
@@ -607,7 +623,7 @@ const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k
 // nueva, en vez de quedarse corriendo el código con el que cargó para
 // siempre — el mismo problema que causó el enjambre de sesiones vencidas del
 // 14/09: un arreglo desplegado no le llega a nadie que no recargue.
-const FRONTEND_VERSION = '2026-09-21T11:05';
+const FRONTEND_VERSION = '2026-09-21T12:10';
 
 let idToken = null;
 
@@ -669,7 +685,7 @@ const MS_ESPERA_LECTURA = 15000;
 const MS_ESPERA_LECTURA_REINTENTO = 30000;
 
 // Acciones que se pueden repetir sin consecuencias.
-const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1 };
+const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1, listarInformes:1 };
 
 // Rastro del último pedido fallado, para mostrarlo en el cartel de error y
 // poder saber qué pasó cuando alguien reporta que no entra.
@@ -844,6 +860,7 @@ const ICONOS = {
   sol:'<circle cx="8" cy="8" r="2.9"/><path d="M8 1.6v1.3M8 13.1v1.3M14.4 8h-1.3M2.9 8H1.6M12.5 3.5l-.9.9M4.4 11.6l-.9.9M12.5 12.5l-.9-.9M4.4 4.4l-.9-.9"/>',
   luna:'<path d="M13.1 9.6A5.6 5.6 0 0 1 6.4 2.9a5.6 5.6 0 1 0 6.7 6.7Z"/>',
   lista:'<path d="M6 4.6h7.4M6 8h7.4M6 11.4h7.4"/><path d="M3.1 4.6h.01M3.1 8h.01M3.1 11.4h.01"/>',
+  calendario:'<rect x="2.6" y="3.4" width="10.8" height="9.6" rx="1.8"/><path d="M2.6 6.6h10.8M5.6 2.2v2.4M10.4 2.2v2.4"/>',
   copiar:'<rect x="5.4" y="5.4" width="8" height="8" rx="1.6"/><path d="M10.6 5.4V4.2a1.6 1.6 0 0 0-1.6-1.6H4.2a1.6 1.6 0 0 0-1.6 1.6V9a1.6 1.6 0 0 0 1.6 1.6h1.2"/>',
 };
 function ico(nombre, tam){
@@ -1311,8 +1328,8 @@ function itemDeTile(emp, tile){
 
 function tileHtml(it){
   const vencLine = it.vencimiento
-    ? `<div class="tile-venc badge ${it.estado_semaforo}">${fmtFecha(it.vencimiento)}${it.venc_inferida ? ' *' : ''}</div>`
-    : `<div class="tile-venc badge gris">Sin vencimiento cargado</div>`;
+    ? `<div class="tile-venc editable badge ${it.estado_semaforo}" title="Tocá para modificar las fechas">${fmtFecha(it.vencimiento)}${it.venc_inferida ? ' *' : ''}</div>`
+    : `<div class="tile-venc editable badge gris" title="Tocá para cargar el vencimiento">Sin vencimiento cargado</div>`;
   const estadoTxt = it.estado_texto ? `<div class="tile-estado-txt">${escapeHtml(it.estado_texto)}</div>` : '';
 
   // Accion que dispara el sistema segun la banda del semaforo.
@@ -1361,6 +1378,7 @@ function tileHtml(it){
     <div class="exp-row">
       <span class="tile-exp">${it.expediente ? 'Exp. ' + escapeHtml(it.expediente) : 'Sin expediente'}</span>
       <button type="button" class="btn-hab" title="Subir la habilitación renovada">${ico('arriba')}</button>
+      <button type="button" class="btn-hab btn-fechas" title="Cargar o modificar las fechas" aria-label="Cargar o modificar las fechas">${ico('calendario')}</button>
       ${it.ultima_subida ? `<button type="button" class="btn-hab btn-deshacer"
          title="Deshacer la subida de «${escapeHtml(it.ultima_subida.nombre)}» — el archivo va a la papelera de Drive"
          aria-label="Deshacer última subida">${ico('deshacer')}</button>` : ''}
@@ -1417,7 +1435,7 @@ function auditoriaHtml(a, carpetas){
   // botón abre el último informe sin importar cuándo se subió.
   const urlUltimoInforme = a.nota_url || (a.ultima_subida && a.ultima_subida.url) || null;
   const btnAbrirInforme = urlUltimoInforme
-    ? `<a class="folder-btn" href="${escapeHtml(urlUltimoInforme)}" target="_blank" rel="noopener" title="Abrir el último informe subido" aria-label="Abrir el último informe subido">${ico('doc')}</a>` : '';
+    ? `<a class="folder-btn" href="${escapeHtml(urlUltimoInforme)}" target="_blank" rel="noopener" title="Abrir el último informe" aria-label="Abrir el último informe">${ico('doc')}</a>` : '';
   return `
     <div class="auditoria ${estado}">
       <div class="aud-main">
@@ -1430,11 +1448,7 @@ function auditoriaHtml(a, carpetas){
         <div class="aud-acciones">
           ${btnAuditoria}
           ${btnAbrirInforme}
-          <button type="button" class="btn-subir">${ico('arriba')} Subir informe</button>
-          ${a.ultima_subida ? `<button type="button" class="folder-btn btn-deshacer-aud"
-             title="Deshacer la subida de «${escapeHtml(a.ultima_subida.nombre)}» y volver a la fecha anterior"
-             aria-label="Deshacer última subida">${ico('deshacer')}</button>` : ''}
-          <input type="file" class="file-input" hidden accept=".pdf,.doc,.docx">
+          <button type="button" class="btn-subir" title="Marcar el informe en la carpeta de auditorías">${ico('doc')} Elegir informe</button>
         </div>
       </div>
       ${nota}
@@ -1667,8 +1681,69 @@ function render(empresas){
     // Habilitación renovada: se elige el archivo, se elige a qué carpeta de
     // esa empresa va, lo sube el backend, y después se carga el vencimiento
     // (que es lo que el panel necesita para recalcular el semáforo).
+    // Bloque donde se arma el formulario de fechas de una habilitación.
+    function bloqueHab(tile, fila){
+      let ok = tile.querySelector('.hab-nueva');
+      if(!ok){
+        ok = document.createElement('div');
+        ok.className = 'hab-nueva';
+        fila.insertAdjacentElement('afterend', ok);
+      }
+      return ok;
+    }
+
+    // Formulario de otorgada/vencimiento. Se usa después de subir un archivo y
+    // también solo, para cargar o corregir las fechas de cualquier habilitación.
+    function pedirFechasEn(ok, it, lineaHtml, textoAviso){
+      ok.innerHTML = lineaHtml + `
+        <div class="linea">${textoAviso}</div>
+        <div class="fechas-renovacion">
+          <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
+          <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
+          <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
+          <button type="button" class="sec btn-cerrar-form">Cerrar</button>
+          <span class="fechas-guardado">Guardado</span>
+        </div>`;
+      ok.querySelector('.btn-cerrar-form').addEventListener('click', ()=> ok.remove());
+      const btnGuardar = ok.querySelector('.btn-guardar-fechas');
+      btnGuardar.addEventListener('click', ()=>{
+        const otorgada = ok.querySelector('.fecha-otorgada').value;
+        const vencimiento = ok.querySelector('.fecha-vencimiento').value;
+        if(!vencimiento){ avisoBarra('Falta la fecha de vencimiento.'); return; }
+        btnGuardar.disabled = true;
+        llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento, empresa: emp.empresa }).then(res=>{
+          btnGuardar.disabled = false;
+          if(res.ok){
+            ok.querySelector('.fechas-guardado').classList.add('on');
+            cargarDatos();
+          } else if(!planillaCambio(res)){
+            // Antes, si el guardado fallaba no pasaba nada en pantalla:
+            // la persona se quedaba creyendo que la fecha quedó cargada.
+            avisoBarra('No se pudieron guardar las fechas.');
+          }
+        }).catch(()=>{
+          btnGuardar.disabled = false;
+          avisoBarra('No se pudieron guardar las fechas.');
+        });
+      });
+    }
+
     card.querySelectorAll('.exp-row').forEach(fila=>{
       const input = fila.querySelector('.hab-input');
+
+      // Cargar o corregir las fechas sin subir ningún archivo: sirve para las
+      // habilitaciones sin vencimiento cargado y para cualquier corrección.
+      function abrirEdicionFechas(){
+        const tile = fila.closest('.tile');
+        const it = itemDeTile(emp, tile);
+        if(!it) return;
+        pedirFechasEn(bloqueHab(tile, fila), it, '', it.vencimiento
+          ? 'Modificá las fechas de la habilitación.'
+          : '<b>Sin vencimiento cargado.</b> Completalo para que el semáforo se actualice.');
+      }
+      fila.querySelector('.btn-fechas').addEventListener('click', abrirEdicionFechas);
+      const badgeVenc = fila.closest('.tile').querySelector('.tile-venc.editable');
+      if(badgeVenc) badgeVenc.addEventListener('click', abrirEdicionFechas);
       fila.querySelector('.btn-hab').addEventListener('click', ()=> input.click());
 
       // Deshacer: manda solo la fila, nunca el id del archivo. El backend sabe
@@ -1700,44 +1775,12 @@ function render(empresas){
         const it = itemDeTile(emp, tile);
         if(!it) return;
 
-        let ok = tile.querySelector('.hab-nueva');
-        if(!ok){
-          ok = document.createElement('div');
-          ok.className = 'hab-nueva';
-          fila.insertAdjacentElement('afterend', ok);
-        }
+        const ok = bloqueHab(tile, fila);
 
         // Formulario de fechas, que se muestra una vez subido el archivo.
         function pedirFechas(lineaHtml){
-          ok.innerHTML = lineaHtml + `
-            <div class="linea"><b>Falta cargar el vencimiento</b> de la nueva habilitación para que el semáforo se actualice.</div>
-            <div class="fechas-renovacion">
-              <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
-              <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
-              <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
-              <span class="fechas-guardado">Guardado</span>
-            </div>`;
-          const btnGuardar = ok.querySelector('.btn-guardar-fechas');
-          btnGuardar.addEventListener('click', ()=>{
-            const otorgada = ok.querySelector('.fecha-otorgada').value;
-            const vencimiento = ok.querySelector('.fecha-vencimiento').value;
-            if(!vencimiento) return;
-            btnGuardar.disabled = true;
-            llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento, empresa: emp.empresa }).then(res=>{
-              btnGuardar.disabled = false;
-              if(res.ok){
-                ok.querySelector('.fechas-guardado').classList.add('on');
-                cargarDatos();
-              } else if(!planillaCambio(res)){
-                // Antes, si el guardado fallaba no pasaba nada en pantalla:
-                // la persona se quedaba creyendo que la fecha quedó cargada.
-                avisoBarra('No se pudieron guardar las fechas.');
-              }
-            }).catch(()=>{
-              btnGuardar.disabled = false;
-              avisoBarra('No se pudieron guardar las fechas.');
-            });
-          });
+          pedirFechasEn(ok, it, lineaHtml,
+            '<b>Falta cargar el vencimiento</b> de la nueva habilitación para que el semáforo se actualice.');
         }
 
         if(file.size > MAX_SUBIDA_MB * 1024 * 1024){
@@ -1859,75 +1902,110 @@ function render(empresas){
       });
     });
 
-    // Informe de auditoría: acá el destino es uno solo (la carpeta de
-    // auditorías de la empresa), así que no hay lista que elegir. Subirlo
-    // también registra la fecha y pone la franja en verde.
+    // Informe de auditoría: NO se sube nada. El técnico crea el informe
+    // directamente en la carpeta AUDITORIAS AMBIENTALES de la empresa; acá lo
+    // marca de la lista de esa carpeta (queda linkeado en la planilla) y después
+    // carga la fecha de la auditoría, igual que en las habilitaciones.
     const strip = card.querySelector('.auditoria');
     // Las empresas que no están en la planilla de visitas tienen franja pero
-    // no botón de subir: sin este chequeo, el addEventListener sobre null
-    // rompía el armado de toda la tarjeta.
+    // no botón: sin este chequeo, el addEventListener sobre null rompía el
+    // armado de toda la tarjeta.
     if(strip && strip.querySelector('.btn-subir')){
-      const input = strip.querySelector('.file-input');
-      const btnSubir = strip.querySelector('.btn-subir');
-      btnSubir.addEventListener('click', ()=> input.click());
+      const btnElegir = strip.querySelector('.btn-subir');
 
-      input.addEventListener('change', ()=>{
-        if(!input.files.length) return;
-        const file = input.files[0];
-        input.value = '';
-
-        const carpetaId = idDeCarpeta(carpetas.auditoria) || carpetas.carpetaId;
-        const nota = strip.querySelector('.nota');
-        function aviso(txt){
-          if(nota) nota.textContent = txt;
-          else strip.insertAdjacentHTML('beforeend', `<span class="nota">${escapeHtml(txt)}</span>`);
+      function cajaAud(){
+        let box = strip.querySelector('.aud-nueva');
+        if(!box){
+          box = document.createElement('div');
+          box.className = 'aud-nueva';
+          strip.appendChild(box);
         }
+        return box;
+      }
+      function cerrarBtn(box){
+        const b = box.querySelector('.cerrar');
+        if(b) b.addEventListener('click', ()=> box.remove());
+      }
 
-        if(!carpetaId){ aviso('No tengo la carpeta de esta empresa en Drive'); return; }
-        if(file.size > MAX_SUBIDA_MB * 1024 * 1024){
-          aviso(`El informe pesa más de ${MAX_SUBIDA_MB} MB, subilo directo en Drive`);
-          return;
-        }
-
-        btnSubir.disabled = true;
-        aviso('Subiendo ' + file.name + '…');
-        subirAlBackend(file, { carpetaId, empresa: emp.empresa,
-                               tipo:'aud', fila: emp.auditoria.fila }).then(r=>{
-          btnSubir.disabled = false;
-          if(!r.ok){ aviso('No se pudo subir: ' + (r.detalle || r.error)); return; }
-          aviso(file.name);
-          // La subida vale como auditoría hecha: se registra la fecha de hoy.
-          llamarBackend('setAuditoria', { fila: emp.auditoria.fila, nota: file.name, url: r.url,
-                          nombrePlanilla: emp.auditoria.nombre_planilla })
-            .then(()=> cargarDatos()).catch(()=>{});
-          strip.className = 'auditoria verde';
-          strip.querySelector('.fecha').textContent = fmtFecha(new Date().toISOString().slice(0,10));
-          const dias = strip.querySelector('.dias');
-          if(dias) dias.textContent = 'hace 0 días · Al día';
-        }).catch(()=>{
-          btnSubir.disabled = false;
-          aviso('No se pudo subir. Probá de nuevo.');
-        });
-      });
-
-      // Deshacer la subida del informe: manda el archivo a la papelera y
-      // devuelve la fecha de auditoría que estaba antes.
-      const btnDeshacerAud = strip.querySelector('.btn-deshacer-aud');
-      if(btnDeshacerAud){
-        btnDeshacerAud.addEventListener('click', ()=>{
-          btnDeshacerAud.disabled = true;
-          btnDeshacerAud.classList.add('girando');
-          llamarBackend('deshacerSubida', { tipo:'aud', fila: emp.auditoria.fila,
-                                            nombrePlanilla: emp.auditoria.nombre_planilla }).then(r=>{
-            if(r.ok) return cargarDatos();
-            btnDeshacerAud.disabled = false;
-            btnDeshacerAud.classList.remove('girando');
-          }).catch(()=>{
-            btnDeshacerAud.disabled = false;
-            btnDeshacerAud.classList.remove('girando');
-          });
+      // Paso 2: el informe ya está marcado; falta la fecha de la auditoría.
+      function pedirFechaAud(box, r){
+        const hoy = new Date().toISOString().slice(0,10);
+        box.innerHTML = `
+          <div class="linea">${ico('check')} Informe marcado:
+            <a class="doc-link" style="margin:0" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.nombre)}</a>
+            <button type="button" class="cerrar">Cerrar</button></div>
+          <div class="linea"><b>Falta cargar la fecha</b> de la auditoría para que el semáforo se actualice.</div>
+          <div class="fechas-renovacion">
+            <label>Fecha de la auditoría <input type="date" class="fecha-aud" value="${escapeHtml(r.fecha || hoy)}" max="${hoy}" required></label>
+            <button type="button" class="btn-guardar-aud">Guardar fecha</button>
+            <span class="fechas-guardado">Guardado</span>
+          </div>`;
+        cerrarBtn(box);
+        const btnG = box.querySelector('.btn-guardar-aud');
+        btnG.addEventListener('click', ()=>{
+          const fecha = box.querySelector('.fecha-aud').value;
+          if(!fecha){ avisoBarra('Falta la fecha de la auditoría.'); return; }
+          btnG.disabled = true;
+          llamarBackend('setAuditoria', { fila: emp.auditoria.fila, fecha,
+                                          nombrePlanilla: emp.auditoria.nombre_planilla }).then(res=>{
+            btnG.disabled = false;
+            if(res.ok){
+              box.querySelector('.fechas-guardado').classList.add('on');
+              cargarDatos();
+            } else if(!planillaCambio(res)){
+              avisoBarra(res.detalle || 'No se pudo guardar la fecha.');
+            }
+          }).catch(()=>{ btnG.disabled = false; avisoBarra('No se pudo guardar la fecha.'); });
         });
       }
+
+      // Paso 1: lista de lo que hay en la carpeta de auditorías.
+      btnElegir.addEventListener('click', ()=>{
+        const box = cajaAud();
+        box.innerHTML = '<div class="linea">Buscando informes en la carpeta…</div>';
+        llamarBackend('listarInformes', { empresa: emp.empresa }).then(r=>{
+          if(!r.ok){
+            box.innerHTML = `<div class="linea">${escapeHtml(r.detalle || 'No se pudo leer la carpeta de auditorías.')}
+              <button type="button" class="cerrar">Cerrar</button></div>`;
+            cerrarBtn(box); return;
+          }
+          const carpetaLink = `<a class="doc-link" style="margin:0" href="${escapeHtml(r.carpeta.url)}" target="_blank" rel="noopener">abrir carpeta en Drive</a>`;
+          if(!r.archivos.length){
+            box.innerHTML = `<div class="linea">La carpeta de auditorías está vacía. Creá el informe ahí y volvé a tocar «Elegir informe». ${carpetaLink}
+              <button type="button" class="cerrar">Cerrar</button></div>`;
+            cerrarBtn(box); return;
+          }
+          box.innerHTML = `
+            <div class="linea">Elegí el informe de esta auditoría · ${carpetaLink}
+              <button type="button" class="cerrar">Cerrar</button></div>
+            <div class="lista-informes">
+              ${r.archivos.map((f,i)=>`<button type="button" class="informe-item" data-i="${i}">
+                <span class="inf-nombre">${escapeHtml(f.sub ? f.sub + ' / ' : '')}${escapeHtml(f.nombre)}</span>
+                <span class="inf-meta">${f.fecha ? fmtFecha(f.fecha) : ''}</span></button>`).join('')}
+            </div>
+            ${r.total > r.archivos.length ? `<div class="linea" style="font-weight:400">Se muestran los ${r.archivos.length} más recientes de ${r.total}.</div>` : ''}`;
+          cerrarBtn(box);
+          box.querySelectorAll('.informe-item').forEach(btn=>{
+            btn.addEventListener('click', ()=>{
+              const f = r.archivos[Number(btn.dataset.i)];
+              box.querySelectorAll('.informe-item').forEach(x=> x.disabled = true);
+              llamarBackend('vincularInforme', { empresa: emp.empresa, archivoId: f.id, fila: emp.auditoria.fila,
+                                                 nombrePlanilla: emp.auditoria.nombre_planilla }).then(v=>{
+                if(v.ok) return pedirFechaAud(box, v);
+                box.querySelectorAll('.informe-item').forEach(x=> x.disabled = false);
+                if(!planillaCambio(v)) avisoBarra(v.detalle || 'No se pudo marcar el informe.');
+              }).catch(()=>{
+                box.querySelectorAll('.informe-item').forEach(x=> x.disabled = false);
+                avisoBarra('No se pudo marcar el informe. Probá de nuevo.');
+              });
+            });
+          });
+        }).catch(()=>{
+          box.innerHTML = `<div class="linea">No se pudo conectar con el backend.
+            <button type="button" class="cerrar">Cerrar</button></div>`;
+          cerrarBtn(box);
+        });
+      });
     }
 
     cont.appendChild(card);
@@ -1979,6 +2057,8 @@ function panelOcupado(){
   // Mientras haya un paso de subida abierto (elegir carpeta o cargar el
   // vencimiento) no se refresca.
   if(document.querySelector('#companies .hab-nueva .fechas-renovacion')) return true;
+  // Igual para la auditoría: lista de informes abierta o fecha por cargar.
+  if(document.querySelector('#companies .aud-nueva .lista-informes, #companies .aud-nueva .fechas-renovacion')) return true;
   return false;
 }
 
