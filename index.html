@@ -607,7 +607,7 @@ const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k
 // nueva, en vez de quedarse corriendo el código con el que cargó para
 // siempre — el mismo problema que causó el enjambre de sesiones vencidas del
 // 14/09: un arreglo desplegado no le llega a nadie que no recargue.
-const FRONTEND_VERSION = '2026-09-14T15:07';
+const FRONTEND_VERSION = '2026-09-21T10:45';
 
 let idToken = null;
 
@@ -659,17 +659,35 @@ function subirAlBackend(file, extra){
 
 // Un pedido que se cuelga dejaba la pantalla de carga girando para siempre.
 // Con un corte propio, falla rápido y con un mensaje, en vez de quedarse.
+// Las lecturas cortan a los 15 s y REINTENTAN con un pedido nuevo (hasta 30 s):
+// el backend casi siempre responde en 1-4 s, pero de vez en cuando un pedido
+// se cuelga (en el servidor una ejecución suelta llega a 16-19 s, o la
+// conexión del navegador se queda trabada) y el pedido nuevo entra bien.
+// Las escrituras no se reintentan nunca (podrían duplicar el cambio).
 const MS_ESPERA_BACKEND = 25000;
+const MS_ESPERA_LECTURA = 15000;
+const MS_ESPERA_LECTURA_REINTENTO = 30000;
 
-// Acciones que se pueden repetir sin consecuencias. Una escritura repetida
-// podría duplicar el cambio, así que esas no se reintentan nunca.
+// Acciones que se pueden repetir sin consecuencias.
 const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1 };
 
-function llamarBackend(action, extra, esReintento){
-  const corte = new AbortController();
-  const reloj = setTimeout(()=> corte.abort(), MS_ESPERA_BACKEND);
+// Rastro del último pedido fallado, para mostrarlo en el cartel de error y
+// poder saber qué pasó cuando alguien reporta que no entra.
+let ultimoFalloBackend = '';
 
-  return fetch(BACKEND_URL, {
+function llamarBackend(action, extra, esReintento){
+  const lectura = !!ACCIONES_LECTURA[action];
+  const espera = !lectura ? MS_ESPERA_BACKEND
+               : esReintento ? MS_ESPERA_LECTURA_REINTENTO : MS_ESPERA_LECTURA;
+  const corte = new AbortController();
+  const reloj = setTimeout(()=> corte.abort(), espera);
+  const t0 = Date.now();
+
+  // En el reintento la URL lleva un parámetro distinto: fuerza un pedido
+  // nuevo de punta a punta en vez de reusar uno que quedó trabado.
+  const url = esReintento ? BACKEND_URL + '?r=' + Date.now() : BACKEND_URL;
+
+  return fetch(url, {
     method:'POST',
     body: JSON.stringify(Object.assign({ action, idToken }, extra || {})),
     signal: corte.signal
@@ -689,8 +707,12 @@ function llamarBackend(action, extra, esReintento){
   })
   .finally(()=> clearTimeout(reloj))
   .catch(err => {
-    if(!esReintento && ACCIONES_LECTURA[action] && err.name !== 'AbortError'){
-      return new Promise(r => setTimeout(r, 900))
+    ultimoFalloBackend = action + ' · ' + err.name + ' a los ' +
+      Math.round((Date.now() - t0) / 1000) + ' s' +
+      (esReintento ? ' (2.º intento)' : '') +
+      (navigator.onLine === false ? ' · sin internet' : '');
+    if(!esReintento && lectura){
+      return new Promise(r => setTimeout(r, 400))
         .then(()=> llamarBackend(action, extra, true));
     }
     throw err;
@@ -789,6 +811,7 @@ function intentarLogin(primerIntento){
         : 'No se pudo conectar con el backend.';
     err.innerHTML = `${escapeHtml(causa)} Casi siempre se arregla recargando la página
       con la versión más nueva.
+      <div style="font-size:12px;font-weight:400;opacity:.8;margin-top:6px">${escapeHtml(ultimoFalloBackend)}</div>
       <button type="button" id="btnRecargarLimpio">Recargar</button>`;
     err.style.display = 'block';
     // Recarga salteando la copia guardada del navegador: GitHub Pages guarda
