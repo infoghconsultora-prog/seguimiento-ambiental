@@ -178,6 +178,9 @@
   .logo-emp{ height:52px; width:auto; max-width:160px; flex:0 0 auto;
     border-radius:var(--r-md); background:#fff; object-fit:contain; padding:4px 7px;
     box-shadow:0 1px 2px rgba(43,47,38,.08); }
+  /* Logos claros (ej. Ferrer: gris casi blanco sobre transparente, hecho para
+     fondo oscuro) desaparecían sobre la caja blanca: se les da fondo oscuro. */
+  .logo-emp.claro{ background:#2b2f26; box-shadow:0 0 0 1px rgba(255,255,255,.14); }
   .logo-fallback{ width:52px; height:52px; flex:0 0 auto; border-radius:var(--r-md);
     background:var(--gray-6); color:var(--label-2);
     display:flex; align-items:center; justify-content:center; font-weight:600; font-size:18px; }
@@ -257,13 +260,19 @@
   .hab-nueva > .linea{ display:flex; align-items:center; gap:7px; }
   .fechas-renovacion{ margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:400; }
   .fechas-renovacion label{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--label-2); }
-  .fechas-renovacion input[type=date], .fechas-renovacion select{
+  .fechas-renovacion input[type=date], .fechas-renovacion input[type=text], .fechas-renovacion select{
     font-family:inherit; font-size:12.5px; padding:5px 7px;
     border-radius:var(--r-sm); border:none; background:var(--surface); color:var(--label); }
   .fechas-renovacion button{ border:none; background:var(--accent); color:#fff; font-weight:600;
     font-size:12.5px; padding:6px 12px; border-radius:var(--r-pill); cursor:pointer; }
   .fechas-renovacion button:disabled{ opacity:.5; cursor:default; }
   .fechas-renovacion button.sec{ background:var(--gray-5); color:var(--label-2); }
+  .agregar-empresa{ margin:8px 0 28px; }
+  .btn-agregar-empresa{ display:inline-flex; align-items:center; gap:7px; border:1px dashed var(--label-3);
+    background:transparent; color:var(--label-2); font:inherit; font-size:14px; font-weight:600;
+    padding:11px 18px; border-radius:var(--r-pill); cursor:pointer; }
+  .btn-agregar-empresa:hover{ border-color:var(--accent); color:var(--accent-ink); }
+  .fechas-renovacion input[type=text].nombre-emp{ min-width:min(260px,100%); }
   .tile-venc.editable{ cursor:pointer; }
   .tile-venc.editable:hover{ filter:brightness(.95); text-decoration:underline; }
   .aud-nueva{ margin:10px 0 0; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
@@ -577,6 +586,10 @@
   <input class="search" id="search" placeholder="Buscar empresa...">
 
   <div id="companies"></div>
+  <div id="agregarEmpresa" class="agregar-empresa">
+    <button type="button" id="btnAgregarEmpresa" class="btn-agregar-empresa">Agregar empresa</button>
+    <div id="agregarEmpresaPanel"></div>
+  </div>
 </main>
 
 <div id="toastSync">Datos actualizados</div>
@@ -623,7 +636,7 @@ const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k
 // nueva, en vez de quedarse corriendo el código con el que cargó para
 // siempre — el mismo problema que causó el enjambre de sesiones vencidas del
 // 14/09: un arreglo desplegado no le llega a nadie que no recargue.
-const FRONTEND_VERSION = '2026-09-21T12:10';
+const FRONTEND_VERSION = '2026-09-21T13:20';
 
 let idToken = null;
 
@@ -685,7 +698,7 @@ const MS_ESPERA_LECTURA = 15000;
 const MS_ESPERA_LECTURA_REINTENTO = 30000;
 
 // Acciones que se pueden repetir sin consecuencias.
-const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1, listarInformes:1 };
+const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1, listarInformes:1, listarCarpetasNuevas:1 };
 
 // Rastro del último pedido fallado, para mostrarlo en el cartel de error y
 // poder saber qué pasó cuando alguien reporta que no entra.
@@ -860,6 +873,7 @@ const ICONOS = {
   sol:'<circle cx="8" cy="8" r="2.9"/><path d="M8 1.6v1.3M8 13.1v1.3M14.4 8h-1.3M2.9 8H1.6M12.5 3.5l-.9.9M4.4 11.6l-.9.9M12.5 12.5l-.9-.9M4.4 4.4l-.9-.9"/>',
   luna:'<path d="M13.1 9.6A5.6 5.6 0 0 1 6.4 2.9a5.6 5.6 0 1 0 6.7 6.7Z"/>',
   lista:'<path d="M6 4.6h7.4M6 8h7.4M6 11.4h7.4"/><path d="M3.1 4.6h.01M3.1 8h.01M3.1 11.4h.01"/>',
+  mas:'<path d="M8 3.2v9.6M3.2 8h9.6"/>',
   calendario:'<rect x="2.6" y="3.4" width="10.8" height="9.6" rx="1.8"/><path d="M2.6 6.6h10.8M5.6 2.2v2.4M10.4 2.2v2.4"/>',
   copiar:'<rect x="5.4" y="5.4" width="8" height="8" rx="1.6"/><path d="M10.6 5.4V4.2a1.6 1.6 0 0 0-1.6-1.6H4.2a1.6 1.6 0 0 0-1.6 1.6V9a1.6 1.6 0 0 0 1.6 1.6h1.2"/>',
 };
@@ -1035,8 +1049,12 @@ const FILTRO_LABEL = {
 };
 
 function aplicar(){
+  // El orden es el de la numeración de las carpetas de las empresas en Drive
+  // (1 ACER, 2 BIOESTANCIA, ...). Las que no tienen número van al final.
+  const numero = e => (e.numero === null || e.numero === undefined) ? Infinity : e.numero;
   const todas = window.PAYLOAD.empresas
-    .filter(emp => emp.empresa.toLowerCase().includes(BUSQUEDA));
+    .filter(emp => emp.empresa.toLowerCase().includes(BUSQUEDA))
+    .sort((a,b)=> (numero(a) - numero(b)) || a.empresa.localeCompare(b.empresa, 'es'));
   render(todas);
 
   const aviso = document.getElementById('filtroAviso');
@@ -2023,7 +2041,98 @@ function render(empresas){
   // refresco automático te manda al principio de la lista mientras estás
   // mirando una empresa del final.
   if(scrollPrevio) window.scrollTo(0, scrollPrevio);
+  cont.querySelectorAll('img.logo-emp').forEach(marcarLogoClaro);
 }
+
+// Un logo con transparencia cuyo contenido es casi blanco no se ve sobre la
+// caja blanca. Los que tienen su propio fondo (JPG) no cuentan: ahí lo opaco
+// es el fondo, no el dibujo.
+const CACHE_LOGO_CLARO = new Map();
+function esLogoClaro(img){
+  try{
+    const w = 40, h = Math.max(8, Math.round(w * img.naturalHeight / img.naturalWidth));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h).data;
+    let suma = 0, opacos = 0;
+    for(let i = 0; i < d.length; i += 4){
+      if(d[i+3] < 60) continue;
+      suma += 0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2];
+      opacos++;
+    }
+    const transparente = 1 - opacos / (w * h);
+    return opacos > 0 && transparente > 0.05 && suma / opacos > 200;
+  }catch(e){ return false; }
+}
+function marcarLogoClaro(img){
+  const aplicarClase = ()=>{
+    const src = img.currentSrc || img.src;
+    if(!CACHE_LOGO_CLARO.has(src)) CACHE_LOGO_CLARO.set(src, esLogoClaro(img));
+    img.classList.toggle('claro', CACHE_LOGO_CLARO.get(src));
+  };
+  if(img.complete && img.naturalWidth) aplicarClase();
+  else img.addEventListener('load', aplicarClase, { once:true });
+}
+
+/* ---------------- agregar una empresa nueva ----------------
+ * Se elige su carpeta de la lista de "2 GH GESTIÓN" (solo las que todavía no
+ * están en el panel). El backend la registra y agrega su bloque al final de la
+ * planilla de habilitaciones; las habilitaciones se cargan ahí.
+ */
+function iniciarAgregarEmpresa(){
+  const btn = document.getElementById('btnAgregarEmpresa');
+  const panel = document.getElementById('agregarEmpresaPanel');
+  btn.insertAdjacentHTML('afterbegin', ico('mas') + ' ');
+  const cerrar = ()=>{ panel.innerHTML = ''; };
+  const caja = html => { panel.innerHTML = `<div class="aud-nueva">${html}</div>`; };
+  const bCerrar = () => '<button type="button" class="cerrar">Cerrar</button>';
+  const enlazarCerrar = ()=>{ const b = panel.querySelector('.cerrar'); if(b) b.addEventListener('click', cerrar); };
+
+  btn.addEventListener('click', ()=>{
+    if(panel.firstChild){ cerrar(); return; }
+    caja('<div class="linea">Buscando las carpetas de 2 GH GESTIÓN…</div>');
+    llamarBackend('listarCarpetasNuevas', {}).then(r=>{
+      if(!r.ok){ caja(`<div class="linea">${escapeHtml(r.detalle || 'No se pudo leer la carpeta.')} ${bCerrar()}</div>`); enlazarCerrar(); return; }
+      if(!r.carpetas.length){
+        caja(`<div class="linea">Todas las carpetas de 2 GH GESTIÓN ya están en el panel. ${bCerrar()}</div>`); enlazarCerrar(); return;
+      }
+      caja(`<div class="linea">Elegí la carpeta de la empresa nueva ${bCerrar()}</div>
+        <div class="lista-informes">${r.carpetas.map((c,i)=>
+          `<button type="button" class="informe-item" data-i="${i}"><span class="inf-nombre">${escapeHtml(c.nombre)}</span></button>`).join('')}</div>`);
+      enlazarCerrar();
+      panel.querySelectorAll('.informe-item').forEach(b=> b.addEventListener('click', ()=> pedirNombre(r.carpetas, r.carpetas[Number(b.dataset.i)])));
+    }).catch(()=>{ caja(`<div class="linea">No se pudo conectar con el backend. ${bCerrar()}</div>`); enlazarCerrar(); });
+  });
+
+  function pedirNombre(todas, c){
+    caja(`<div class="linea">Carpeta: <b>${escapeHtml(c.nombre)}</b> ${bCerrar()}</div>
+      <div class="fechas-renovacion">
+        <label>Nombre en el panel <input type="text" class="nombre-emp" maxlength="80" value="${escapeHtml(c.sugerido)}"></label>
+        <button type="button" class="btn-confirmar-emp">Agregar empresa</button>
+        <button type="button" class="sec volver">Elegir otra</button>
+      </div>
+      <div class="linea" style="font-weight:400">Se agrega al final de la planilla de habilitaciones. Las habilitaciones se cargan ahí.</div>`);
+    enlazarCerrar();
+    panel.querySelector('.volver').addEventListener('click', ()=>{ cerrar(); btn.click(); });
+    const ok = panel.querySelector('.btn-confirmar-emp');
+    ok.addEventListener('click', ()=>{
+      const nombre = panel.querySelector('.nombre-emp').value.trim();
+      if(nombre.length < 2){ avisoBarra('Escribí el nombre de la empresa.'); return; }
+      ok.disabled = true;
+      llamarBackend('agregarEmpresa', { carpetaId: c.id, nombre }).then(res=>{
+        if(!res.ok){ ok.disabled = false; avisoBarra(res.detalle || 'No se pudo agregar la empresa.', 4500); return; }
+        cerrar();
+        avisoBarra(`Empresa «${res.empresa}» agregada.`, 3500);
+        return cargarDatos().then(()=>{
+          refrescarCarpetas();
+          const tarjeta = Array.from(document.querySelectorAll('#companies .company')).find(x=> x.dataset.empresa === res.empresa);
+          if(tarjeta) tarjeta.scrollIntoView({ behavior:'smooth', block:'center' });
+        });
+      }).catch(()=>{ ok.disabled = false; avisoBarra('No se pudo agregar la empresa. Probá de nuevo.'); });
+    });
+  }
+}
+iniciarAgregarEmpresa();
 
 /* ---------------- sincronización entre usuarios ----------------
  * Apps Script no permite mantener una conexión abierta, así que no existe el
