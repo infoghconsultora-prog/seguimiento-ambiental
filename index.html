@@ -607,7 +607,7 @@ const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k
 // nueva, en vez de quedarse corriendo el código con el que cargó para
 // siempre — el mismo problema que causó el enjambre de sesiones vencidas del
 // 14/09: un arreglo desplegado no le llega a nadie que no recargue.
-const FRONTEND_VERSION = '2026-09-21T10:45';
+const FRONTEND_VERSION = '2026-09-21T11:05';
 
 let idToken = null;
 
@@ -1680,7 +1680,7 @@ function render(empresas){
           if(!it) return;
           btnDeshacer.disabled = true;
           btnDeshacer.classList.add('girando');
-          llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila }).then(r=>{
+          llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila, empresa: emp.empresa }).then(r=>{
             if(r.ok) return cargarDatos();
             btnDeshacer.disabled = false;
             btnDeshacer.classList.remove('girando');
@@ -1710,6 +1710,7 @@ function render(empresas){
         // Formulario de fechas, que se muestra una vez subido el archivo.
         function pedirFechas(lineaHtml){
           ok.innerHTML = lineaHtml + `
+            <div class="linea"><b>Falta cargar el vencimiento</b> de la nueva habilitación para que el semáforo se actualice.</div>
             <div class="fechas-renovacion">
               <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
               <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
@@ -1775,6 +1776,7 @@ function render(empresas){
                 escapeHtml(r.detalle || r.error) + '</div>';
               return;
             }
+            if(r.enlazado === false) avisoBarra('El archivo se subió, pero no pude enlazarlo en la planilla.', 5000);
             pedirFechas('<div class="linea">' + ico('check') + ' Guardado en ' +
               escapeHtml(r.carpeta) + ' — <a class="doc-link" href="' + escapeHtml(r.url) +
               '" target="_blank" rel="noopener">ver</a>' +
@@ -1788,7 +1790,7 @@ function render(empresas){
             btnRecien.addEventListener('click', ()=>{
               btnRecien.disabled = true;
               btnRecien.classList.add('girando');
-              llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila }).then(res=>{
+              llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila, empresa: emp.empresa }).then(res=>{
                 if(res.ok){
                   ok.innerHTML = '<div class="linea">Subida deshecha. El archivo quedó en la papelera de Drive.</div>';
                   return;
@@ -1971,6 +1973,12 @@ function panelOcupado(){
      (a.isContentEditable || a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')) return true;
   const ov = document.getElementById('modalOverlay');
   if(ov && ov.classList.contains('on')) return true;
+  // Subir una habilitación suma +1 a la versión de los datos, y el sondeo de
+  // esta misma pestaña lo tomaba como un cambio ajeno: redibujaba la tarjeta
+  // y borraba el formulario de fechas antes de que se pudiera completar.
+  // Mientras haya un paso de subida abierto (elegir carpeta o cargar el
+  // vencimiento) no se refresca.
+  if(document.querySelector('#companies .hab-nueva .fechas-renovacion')) return true;
   return false;
 }
 
