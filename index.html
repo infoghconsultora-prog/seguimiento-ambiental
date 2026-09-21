@@ -636,7 +636,7 @@ const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k
 // nueva, en vez de quedarse corriendo el código con el que cargó para
 // siempre — el mismo problema que causó el enjambre de sesiones vencidas del
 // 14/09: un arreglo desplegado no le llega a nadie que no recargue.
-const FRONTEND_VERSION = '2026-09-21T13:20';
+const FRONTEND_VERSION = '2026-09-21T14:10';
 
 let idToken = null;
 
@@ -686,65 +686,108 @@ function subirAlBackend(file, extra){
   });
 }
 
-// Un pedido que se cuelga dejaba la pantalla de carga girando para siempre.
-// Con un corte propio, falla rápido y con un mensaje, en vez de quedarse.
-// Las lecturas cortan a los 15 s y REINTENTAN con un pedido nuevo (hasta 30 s):
-// el backend casi siempre responde en 1-4 s, pero de vez en cuando un pedido
-// se cuelga (en el servidor una ejecución suelta llega a 16-19 s, o la
-// conexión del navegador se queda trabada) y el pedido nuevo entra bien.
-// Las escrituras no se reintentan nunca (podrían duplicar el cambio).
-const MS_ESPERA_BACKEND = 25000;
-const MS_ESPERA_LECTURA = 15000;
-const MS_ESPERA_LECTURA_REINTENTO = 30000;
-
-// Acciones que se pueden repetir sin consecuencias.
+/* --------------------- pedidos al backend, a prueba de fallas ---------------------
+ * Los web apps de Apps Script fallan de forma intermitente en la "puerta de
+ * entrada" de Google: medido el 21/09, entre un 3 % y un 15 % de los pedidos
+ * (aun un GET que no hace nada) se cuelgan 20-60 s o terminan en un 404 con la
+ * página "No se pudo abrir el archivo", mientras el código del backend anda en
+ * 1-3 s. No hay nada que arreglar adentro, así que cada pedido no depende de
+ * que un solo intento salga bien:
+ *  - Lecturas: si el primer pedido no respondió en 3,5 s se manda un segundo EN
+ *    PARALELO (sin cortar el primero), después un tercero, etc. Gana el primero
+ *    que devuelve una respuesta válida y se cancelan los demás.
+ *  - Un 404 / respuesta que no es JSON cuenta como falla y dispara el siguiente
+ *    intento al instante.
+ *  - Escrituras: llevan un requestId y el backend las ejecuta UNA sola vez
+ *    aunque lleguen varias veces, así que también pueden reintentarse sin
+ *    duplicar un cambio, un archivo ni un mail.
+ */
 const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1, listarInformes:1, listarCarpetasNuevas:1 };
+
+// escalones: ms (desde el primer pedido) en que arranca cada intento paralelo.
+// max: tope de intentos. porIntento: corte de cada uno. tope: corte de todo.
+const PLAN_LECTURA   = { escalones:[0, 3500, 8000, 14000], max:5, porIntento:20000, tope:45000 };
+const PLAN_SONDEO    = { escalones:[0, 9000],               max:2, porIntento:12000, tope:20000 };
+const PLAN_ESCRITURA = { escalones:[0, 12000, 24000],       max:3, porIntento:30000, tope:55000 };
+// Un archivo grande no se manda tres veces en paralelo: solo se reintenta si falló.
+const PLAN_SUBIDA    = { escalones:[0],                     max:3, porIntento:100000, tope:240000 };
 
 // Rastro del último pedido fallado, para mostrarlo en el cartel de error y
 // poder saber qué pasó cuando alguien reporta que no entra.
 let ultimoFalloBackend = '';
 
-function llamarBackend(action, extra, esReintento){
+function nuevoRequestId(){
+  const base = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+             : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  return base.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+}
+
+function llamarBackend(action, extra){
   const lectura = !!ACCIONES_LECTURA[action];
-  const espera = !lectura ? MS_ESPERA_BACKEND
-               : esReintento ? MS_ESPERA_LECTURA_REINTENTO : MS_ESPERA_LECTURA;
-  const corte = new AbortController();
-  const reloj = setTimeout(()=> corte.abort(), espera);
+  const plan = action === 'getVersion' ? PLAN_SONDEO
+             : lectura ? PLAN_LECTURA
+             : action === 'subirArchivo' ? PLAN_SUBIDA : PLAN_ESCRITURA;
+  const cuerpo = Object.assign({ action, idToken }, extra || {});
+  if(!lectura) cuerpo.requestId = nuevoRequestId();
+  const texto = JSON.stringify(cuerpo);
   const t0 = Date.now();
 
-  // En el reintento la URL lleva un parámetro distinto: fuerza un pedido
-  // nuevo de punta a punta en vez de reusar uno que quedó trabado.
-  const url = esReintento ? BACKEND_URL + '?r=' + Date.now() : BACKEND_URL;
+  return new Promise((resolve, reject)=>{
+    let terminado = false, lanzados = 0, activos = 0, ultimoError = null;
+    const controles = [], relojes = [];
+    const cerrar = (fin, valor)=>{
+      if(terminado) return;
+      terminado = true;
+      relojes.forEach(clearTimeout);
+      controles.forEach(c=> c.abort());
+      fin(valor);
+    };
+    const anotar = (err, n)=>{
+      ultimoFalloBackend = action + ' · ' + (err && err.name || 'error') + ' a los ' +
+        Math.round((Date.now() - t0) / 1000) + ' s (intento ' + n + ' de ' + plan.max + ')' +
+        (navigator.onLine === false ? ' · sin internet' : '');
+    };
 
-  return fetch(url, {
-    method:'POST',
-    body: JSON.stringify(Object.assign({ action, idToken }, extra || {})),
-    signal: corte.signal
-  })
-  .then(r => r.text())
-  .then(txt => {
-    try { return JSON.parse(txt); }
-    catch(e){
-      // Apps Script a veces responde con su propia página de error en HTML
-      // ("No se pudo abrir el archivo en este momento") en lugar de la
-      // respuesta. Antes eso explotaba dentro de r.json() y llegaba al panel
-      // como si fuera un problema de red, sin forma de distinguirlo.
-      const err = new Error('El backend respondió algo que no es JSON');
-      err.name = 'RespuestaInvalida';
-      throw err;
+    function lanzar(){
+      if(terminado || lanzados >= plan.max) return;
+      const n = ++lanzados;
+      activos++;
+      const corte = new AbortController();
+      controles.push(corte);
+      // Cada intento lleva un parámetro distinto: fuerza un pedido nuevo de
+      // punta a punta en vez de reusar uno que quedó trabado.
+      const url = n === 1 ? BACKEND_URL : BACKEND_URL + '?r=' + Date.now() + '_' + n;
+      const reloj = setTimeout(()=> corte.abort(), plan.porIntento);
+      fetch(url, { method:'POST', body: texto, signal: corte.signal })
+        .then(r => r.text())
+        .then(txt => {
+          try { return JSON.parse(txt); }
+          catch(e){
+            // Apps Script a veces responde con su propia página de error en
+            // HTML ("No se pudo abrir el archivo en este momento") en lugar
+            // de la respuesta: cuenta como falla de ese intento.
+            const err = new Error('El backend respondió algo que no es JSON');
+            err.name = 'RespuestaInvalida';
+            throw err;
+          }
+        })
+        .then(json => cerrar(resolve, json))
+        .catch(err => { if(!terminado){ ultimoError = err; anotar(err, n); } })
+        .finally(()=>{
+          clearTimeout(reloj);
+          activos--;
+          if(terminado) return;
+          if(lanzados < plan.max) lanzar();                 // falló: el siguiente, ya
+          else if(activos === 0) cerrar(reject, ultimoError || new Error('sin respuesta'));
+        });
     }
-  })
-  .finally(()=> clearTimeout(reloj))
-  .catch(err => {
-    ultimoFalloBackend = action + ' · ' + err.name + ' a los ' +
-      Math.round((Date.now() - t0) / 1000) + ' s' +
-      (esReintento ? ' (2.º intento)' : '') +
-      (navigator.onLine === false ? ' · sin internet' : '');
-    if(!esReintento && lectura){
-      return new Promise(r => setTimeout(r, 400))
-        .then(()=> llamarBackend(action, extra, true));
-    }
-    throw err;
+
+    plan.escalones.slice(1).forEach(ms=> relojes.push(setTimeout(lanzar, ms)));
+    relojes.push(setTimeout(()=>{
+      if(!ultimoError){ const e = new Error('tiempo agotado'); e.name = 'AbortError'; ultimoError = e; anotar(e, lanzados); }
+      cerrar(reject, ultimoError);
+    }, plan.tope));
+    lanzar();
   });
 }
 
@@ -2138,7 +2181,7 @@ iniciarAgregarEmpresa();
  * Apps Script no permite mantener una conexión abierta, así que no existe el
  * "tiempo real" de un Google Docs (ver el cursor del otro mientras escribe).
  * Lo más cercano, y alcanza de sobra para este panel, es preguntar seguido:
- * cada 20 s cada panel abierto consulta si cambió algo. Esa consulta NO lee
+ * cada 30 s cada panel abierto consulta si cambió algo. Esa consulta NO lee
  * las planillas — el backend responde con una huella (contador de cambios +
  * fecha de modificación de cada planilla), así que es barata y se puede hacer
  * todo el día sin comerse la cuota diaria de Apps Script. Recién cuando la
@@ -2147,7 +2190,7 @@ iniciarAgregarEmpresa();
  * Resultado: lo que sube o edita una persona le aparece a las demás en menos
  * de medio minuto, sin que nadie tenga que recargar la página.
  */
-const INTERVALO_SYNC = 20000;
+const INTERVALO_SYNC = 30000;
 let versionVista = null;
 let syncEnCurso = false;
 let syncIntervalo = null;
@@ -2191,7 +2234,7 @@ function chequearVersion(){
     fallosAuthSeguidos = 0;
     if(versionVista === null){ versionVista = r.version; return; }
     if(r.version === versionVista) return;
-    if(panelOcupado()) return;   // sin tocar la versión: reintenta en 20 s
+    if(panelOcupado()) return;   // sin tocar la versión: reintenta en 30 s
     versionVista = r.version;
     return cargarDatos().then(()=> avisarActualizado());
   }).catch(()=>{}).then(()=>{ syncEnCurso = false; });
