@@ -630,13 +630,18 @@
    --------------------------------------------------------------- */
 const CLIENT_ID  = '397447072902-nhbl4at1hhd41igam0hbq7p2kc0gt8up.apps.googleusercontent.com';
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwYtx818QRgsM3mcY9k2o2gI_oDSOlDrkQs7PbMDNRvDEUR6ajoAhABSNVuCmHi9PpDNw/exec';
+// Segundo backend, copia SOLO LECTURA del principal (misma cuenta, mismas planillas
+// y carpetas). Google falla de forma intermitente y por proyecto; las lecturas se
+// reparten entre los dos y gana el primero que responde. Las escrituras van
+// siempre al principal.
+const BACKEND_ESPEJO = 'https://script.google.com/macros/s/AKfycbw_7WlQUa1MWjrtAzyoNafm8nFSD0ZT2IWFyoA5j2Vv0NJOIiFWy7s3WInb7Wko4idt/exec';
 
 // Se pisa a mano en cada publish (fecha UTC del momento de publicar). Sirve
 // para que una pestaña vieja se entere sola de que hay una versión más
 // nueva, en vez de quedarse corriendo el código con el que cargó para
 // siempre — el mismo problema que causó el enjambre de sesiones vencidas del
 // 14/09: un arreglo desplegado no le llega a nadie que no recargue.
-const FRONTEND_VERSION = '2026-09-21T14:10';
+const FRONTEND_VERSION = '2026-09-25T12:10';
 
 let idToken = null;
 
@@ -706,8 +711,8 @@ const ACCIONES_LECTURA = { getData:1, getCarpetas:1, getLogos:1, getVersion:1, l
 
 // escalones: ms (desde el primer pedido) en que arranca cada intento paralelo.
 // max: tope de intentos. porIntento: corte de cada uno. tope: corte de todo.
-const PLAN_LECTURA   = { escalones:[0, 3500, 8000, 14000], max:5, porIntento:20000, tope:45000 };
-const PLAN_SONDEO    = { escalones:[0, 9000],               max:2, porIntento:12000, tope:20000 };
+const PLAN_LECTURA   = { escalones:[0, 4000, 8000, 13000, 20000], max:5, porIntento:25000, tope:50000 };
+const PLAN_SONDEO    = { escalones:[0, 5000],               max:2, porIntento:15000, tope:22000 };
 const PLAN_ESCRITURA = { escalones:[0, 12000, 24000],       max:3, porIntento:30000, tope:55000 };
 // Un archivo grande no se manda tres veces en paralelo: solo se reintenta si falló.
 const PLAN_SUBIDA    = { escalones:[0],                     max:3, porIntento:100000, tope:240000 };
@@ -744,7 +749,7 @@ function llamarBackend(action, extra){
     };
     const anotar = (err, n)=>{
       ultimoFalloBackend = action + ' · ' + (err && err.name || 'error') + ' a los ' +
-        Math.round((Date.now() - t0) / 1000) + ' s (intento ' + n + ' de ' + plan.max + ')' +
+        Math.round((Date.now() - t0) / 1000) + ' s (intento ' + n + ' de ' + plan.max + (n % 2 === 0 && lectura ? ', espejo' : '') + ')' +
         (navigator.onLine === false ? ' · sin internet' : '');
     };
 
@@ -754,9 +759,13 @@ function llamarBackend(action, extra){
       activos++;
       const corte = new AbortController();
       controles.push(corte);
-      // Cada intento lleva un parámetro distinto: fuerza un pedido nuevo de
-      // punta a punta en vez de reusar uno que quedó trabado.
-      const url = n === 1 ? BACKEND_URL : BACKEND_URL + '?r=' + Date.now() + '_' + n;
+      // Lecturas: principal, espejo, principal, espejo... (los dos proyectos fallan
+      // por separado). Escrituras: siempre el principal.
+      const enEspejo = lectura && (n % 2 === 0);
+      const base = enEspejo ? BACKEND_ESPEJO : BACKEND_URL;
+      // Del tercer intento en adelante se repite proyecto: el parámetro distinto
+      // fuerza un pedido nuevo de punta a punta en vez de reusar uno trabado.
+      const url = n <= 2 ? base : base + '?r=' + Date.now() + '_' + n;
       const reloj = setTimeout(()=> corte.abort(), plan.porIntento);
       fetch(url, { method:'POST', body: texto, signal: corte.signal })
         .then(r => r.text())
@@ -1001,6 +1010,7 @@ function refrescarCarpetas(vuelta){
     let cambio = false;
     window.PAYLOAD.empresas.forEach(emp=>{
       const nueva = cData.carpetas[emp.empresa] || null;
+      if(!nueva && emp.carpetas) return;   // una respuesta incompleta no borra lo ya cargado
       if(JSON.stringify(nueva) !== JSON.stringify(emp.carpetas)){
         emp.carpetas = nueva;
         cambio = true;
