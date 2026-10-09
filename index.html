@@ -275,6 +275,15 @@
   .fechas-renovacion input[type=text].nombre-emp{ min-width:min(260px,100%); }
   .tile-venc.editable{ cursor:pointer; }
   .tile-venc.editable:hover{ filter:brightness(.95); text-decoration:underline; }
+  .frec-edit{ border:none; background:none; color:inherit; font:inherit; cursor:pointer;
+    padding:0; text-decoration:underline dotted; text-underline-offset:3px; }
+  .frec-edit:hover{ text-decoration-style:solid; }
+  .btn-aud-mas{ display:inline-flex; align-items:center; gap:6px; border:none; cursor:pointer; font:inherit;
+    font-size:13px; font-weight:600; padding:8px 14px; border-radius:var(--r-pill);
+    background:rgba(255,255,255,.28); color:inherit; }
+  .btn-aud-mas:hover{ background:rgba(255,255,255,.42); }
+  .aud-nueva input[type=number]{ font-family:inherit; font-size:12.5px; padding:5px 7px; width:64px;
+    border-radius:var(--r-sm); border:none; background:var(--surface); color:var(--label); }
   .aud-nueva{ margin:10px 0 0; font-size:13px; line-height:18px; font-weight:600; color:var(--accent-ink);
     background:var(--verde-bg); border-radius:var(--r-sm); padding:10px 12px; }
   .aud-nueva > .linea{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -578,8 +587,8 @@
     <span class="chip"><span class="dot verde"></span>Al día</span>
     <span class="chip"><span class="dot amarillo"></span>Faltan 2 semanas</span>
     <span class="chip"><span class="dot naranja"></span>Falta 1 semana</span>
-    <span class="chip"><span class="dot rojo"></span>Cumplió el mes (hasta +1 semana)</span>
-    <span class="chip"><span class="dot negro"></span>Se pasó del mes</span>
+    <span class="chip"><span class="dot rojo"></span>Cumplió el plazo (hasta +1 semana)</span>
+    <span class="chip"><span class="dot negro"></span>Se pasó del plazo</span>
     <button type="button" id="btnPendientes" class="btn-pendientes">Ver auditorías pendientes</button>
   </div>
 
@@ -641,7 +650,7 @@ const BACKEND_ESPEJO = 'https://script.google.com/macros/s/AKfycbw_7WlQUa1MWjrtA
 // nueva, en vez de quedarse corriendo el código con el que cargó para
 // siempre — el mismo problema que causó el enjambre de sesiones vencidas del
 // 14/09: un arreglo desplegado no le llega a nadie que no recargue.
-const FRONTEND_VERSION = '2026-09-25T12:10';
+const FRONTEND_VERSION = '2026-10-09T14:20';
 
 let idToken = null;
 
@@ -1381,7 +1390,7 @@ function estadoAuditoria(dias, esporadica){
 
 const AUD_LABEL = {
   verde:'Al día', amarillo:'Faltan 2 semanas', naranja:'Falta 1 semana',
-  rojo:'Cumplió el mes', negro:'Se pasó del mes', gris:'Sin auditoría registrada',
+  rojo:'Cumplió el plazo', negro:'Se pasó del plazo', gris:'Sin auditoría registrada',
   porconfirmar:'Frecuencia a confirmar'
 };
 
@@ -1486,9 +1495,10 @@ function auditoriaHtml(a, carpetas){
           </div>
           <div class="aud-acciones">
             ${btnAuditoria}
+            <button type="button" class="btn-aud-mas" title="Sumarla a la planilla de visitas y definir cada cuántos meses se hace el recorrido">${ico('mas')} Incluir en recorridos</button>
           </div>
         </div>
-        <span class="nota">No figura en la planilla de visitas técnicas. Agregala ahí para hacerle seguimiento.</span>
+        <span class="nota">No figura en la planilla de visitas técnicas. Con «Incluir en recorridos» queda en la lista y le definís cada cuántos meses se hace.</span>
       </div>`;
   }
 
@@ -1498,7 +1508,7 @@ function auditoriaHtml(a, carpetas){
     `<span class="dias">hace ${a.dias} días · ${AUD_LABEL[estado]}</span>`;
   // Sin el "·" adelante: en pantalla ancha los separa el gap del flex, y en
   // teléfono, cuando cae en su propio renglón, quedaba un punto suelto.
-  const frec = `<span class="frec">${a.frecuencia}${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
+  const frec = `<span class="frec"><button type="button" class="frec-edit" title="Cambiar cada cuántos meses se hace el recorrido">${a.frecuencia}</button>${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
   const nota = a.nota ? `<span class="nota">${escapeHtml(a.nota)}</span>` : '';
   // El link puede venir de la celda (subida reciente, con el nota_url que
   // guarda setAuditoria_) o, para subidas de antes de tener ese campo,
@@ -1972,6 +1982,51 @@ function render(empresas){
         }, 900);
       });
     });
+
+    // Recorridos: sumar la empresa a la lista de visitas o cambiar cada cuántos
+    // meses se hace. Es el mismo cuadrito para las dos cosas.
+    (function(){
+      const stripR = card.querySelector('.auditoria');
+      if(!stripR) return;
+      const btnMas = stripR.querySelector('.btn-aud-mas');
+      const btnFrec = stripR.querySelector('.frec-edit');
+      if(!btnMas && !btnFrec) return;
+
+      function formularioMeses(titulo, inicial, guardar){
+        let box = stripR.querySelector('.aud-nueva');
+        if(!box){ box = document.createElement('div'); box.className = 'aud-nueva'; stripR.appendChild(box); }
+        box.innerHTML = `
+          <div class="linea">${titulo}<button type="button" class="cerrar">Cerrar</button></div>
+          <div class="fechas-renovacion">
+            <label>Recorrido cada <input type="number" class="meses-aud" min="1" max="24" step="1" value="${inicial}"> meses</label>
+            <button type="button" class="btn-guardar-meses">Guardar</button>
+            <span class="fechas-guardado">Guardado</span>
+          </div>
+          <div class="linea" style="font-weight:400">Ejemplos: 1 = mensual · 3 = trimestral · 6 = semestral · 12 = anual.</div>`;
+        box.querySelector('.cerrar').addEventListener('click', ()=> box.remove());
+        const b = box.querySelector('.btn-guardar-meses');
+        b.addEventListener('click', ()=>{
+          const meses = Number(box.querySelector('.meses-aud').value);
+          if(!Number.isInteger(meses) || meses < 1 || meses > 24){ avisoBarra('Poné un número entero de meses entre 1 y 24.'); return; }
+          b.disabled = true;
+          guardar(meses).then(res=>{
+            b.disabled = false;
+            if(res.ok){ box.querySelector('.fechas-guardado').classList.add('on'); cargarDatos(); }
+            else if(!planillaCambio(res)) avisoBarra(res.detalle || 'No se pudo guardar.', 4500);
+          }).catch(()=>{ b.disabled = false; avisoBarra('No se pudo guardar. Probá de nuevo.'); });
+        });
+      }
+
+      if(btnMas) btnMas.addEventListener('click', ()=>{
+        formularioMeses(`Sumar a <b>${escapeHtml(emp.empresa)}</b> a la lista de recorridos`, 1,
+          meses => llamarBackend('agregarAuditoria', { empresa: emp.empresa, meses }));
+      });
+      if(btnFrec) btnFrec.addEventListener('click', ()=>{
+        formularioMeses('Cada cuántos meses se hace el recorrido', emp.auditoria.meses || 1,
+          meses => llamarBackend('setFrecuenciaAuditoria', { fila: emp.auditoria.fila,
+                                   nombrePlanilla: emp.auditoria.nombre_planilla, meses }));
+      });
+    })();
 
     // Informe de auditoría: NO se sube nada. El técnico crea el informe
     // directamente en la carpeta AUDITORIAS AMBIENTALES de la empresa; acá lo
