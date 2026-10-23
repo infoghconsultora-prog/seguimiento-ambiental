@@ -574,33 +574,6 @@
     *,*::before,*::after{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
   }
 </style>
-<script>try{var e=localStorage.getItem('gh-escala:seguimiento-ambiental');if(e==='115'||e==='130'||e==='150')document.documentElement.setAttribute('data-escala',e)}catch(_){}</script>
-<style>
-/* ---------- tamaño de interfaz (control de accesibilidad; escala todo con zoom) ---------- */
-html[data-escala="115"]{zoom:1.15;--gh-z:1.15}
-html[data-escala="130"]{zoom:1.3;--gh-z:1.3}
-html[data-escala="150"]{zoom:1.5;--gh-z:1.5}
-@media print{html[data-escala]{zoom:1}}
-.gh-esc{position:relative;flex:none;width:44px;height:44px;display:inline-grid;place-items:center;padding:0;border:0;border-radius:50%;
-  background:rgba(128,128,128,.14);color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-.gh-esc:active{background:rgba(128,128,128,.28)}
-.gh-esc:focus-visible{outline:2px solid currentColor;outline-offset:2px}
-.gh-esc svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.gh-esc-n{position:absolute;left:50%;transform:translateX(-50%);bottom:-9px;min-width:30px;padding:0 4px;border-radius:999px;background:#4a7a1e;color:#fff;
-  font:700 11px/16px -apple-system,"SF Pro Text",system-ui,sans-serif;text-align:center}
-.gh-esc-n:empty{display:none}
-.gh-esc[hidden]{display:none}
-.gh-esc-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@supports not (zoom:1){.gh-esc{display:none}}
-/* con zoom, vh/dvh también se multiplican: se divide para que las pantallas altas sigan midiendo el alto real */
-.gh-login{min-height:calc(100vh / var(--gh-z,1));min-height:calc(100dvh / var(--gh-z,1))}
-/* con el viewport efectivo más angosto, el botón de Google necesita lugar: se achican los rellenos del login */
-html[data-escala="130"] .gh-login{padding-left:8px;padding-right:8px}
-html[data-escala="130"] .gh-login-card{padding-left:14px;padding-right:14px}
-html[data-escala="150"] .gh-login{padding-left:4px;padding-right:4px}
-html[data-escala="150"] .gh-login-card{padding-left:8px;padding-right:8px}
-#modalCard{max-height:min(calc(82vh / var(--gh-z,1)),780px)}
-</style>
 </head>
 <body>
 
@@ -631,7 +604,6 @@ html[data-escala="150"] .gh-login-card{padding-left:8px;padding-right:8px}
   <div class="head-right">
     <span class="account" id="account"><b id="accountEmail"></b><button type="button" id="btnSalir">Salir</button></span>
     <button type="button" id="btnActualizarTodo" class="folder-btn" title="Actualizar datos del panel" aria-label="Actualizar datos del panel"></button>
-    <button type="button" class="gh-esc" id="btnEscalaMenos" aria-label="Achicar letra" title="Achicar letra" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/></svg></button><button type="button" class="gh-esc" id="btnEscala" aria-label="Agrandar letra" title="Agrandar letra"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg><span class="gh-esc-n" id="escalaNivel" aria-hidden="true"></span></button><span class="gh-esc-sr" id="escalaLive" role="status" aria-live="polite"></span>
     <div class="seg" id="temaSeg" role="group" aria-label="Tema">
       <button type="button" data-tema="light" aria-label="Modo claro"></button>
       <button type="button" data-tema="auto">Auto</button>
@@ -1145,10 +1117,962 @@ function arrancar(payload){
     });
   }
   seg.querySelectorAll('button').forEach(b=>
-    function ir(n){v=n;poner(v,true);try{if(v===100)localStorage.removeItem(K);else localStorage.setItem(K,String(v))}catch(e){}}
-  b.addEventListener('click',function(){ir(N[(N.indexOf(v)+1)%N.length])});
-  var m=document.getElementById('btnEscalaMenos');if(m)m.addEventListener('click',function(){ir(N[Math.max(0,N.indexOf(v)-1)])});
-})();
+    b.addEventListener('click', ()=> aplicarTema(b.dataset.tema)));
+  aplicarTema('auto');
+  window.addEventListener('resize', ()=>{
+    const activo = seg.querySelector('button.on');
+    if(activo){ thumb.style.width = activo.offsetWidth + 'px';
+                thumb.style.transform = `translateX(${activo.offsetLeft - 3}px)`; }
+  });
+
+  const overlay = document.getElementById('modalOverlay');
+  document.getElementById('btnPendientes').addEventListener('click', abrirPendientes);
+  document.getElementById('modalCerrar').innerHTML = ico('equis');
+  document.getElementById('btnPendientes').insertAdjacentHTML('afterbegin', ico('lista') + ' ');
+  document.getElementById('btnCopiar').insertAdjacentHTML('afterbegin', ico('copiar') + ' ');
+  document.getElementById('modalCerrar').addEventListener('click', ()=> overlay.classList.remove('on'));
+  overlay.addEventListener('click', e=>{ if(e.target === overlay) overlay.classList.remove('on'); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') overlay.classList.remove('on'); });
+
+  document.getElementById('btnCopiar').addEventListener('click', async ()=>{
+    const txt = textoParaWhatsapp();
+    const ok = document.getElementById('copiaOk');
+    try{
+      await navigator.clipboard.writeText(txt);
+    }catch(err){
+      // Navegadores que no dan permiso al portapapeles: se copia con un textarea temporal.
+      const ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    ok.classList.add('on');
+    setTimeout(()=> ok.classList.remove('on'), 1800);
+  });
+}
+
+const FILTRO_LABEL = {
+  rojo:'vencidas', naranja:'que vencen en 3 meses o menos',
+  amarillo:'a 3 meses y una semana', verde:'vigentes', gris:'sin fecha cargada'
+};
+
+function aplicar(){
+  // El orden es el de la numeración de las carpetas de las empresas en Drive
+  // (1 ACER, 2 BIOESTANCIA, ...). Las que no tienen número van al final.
+  const numero = e => (e.numero === null || e.numero === undefined) ? Infinity : e.numero;
+  const todas = window.PAYLOAD.empresas
+    .filter(emp => emp.empresa.toLowerCase().includes(BUSQUEDA))
+    .sort((a,b)=> (numero(a) - numero(b)) || a.empresa.localeCompare(b.empresa, 'es'));
+  render(todas);
+
+  const aviso = document.getElementById('filtroAviso');
+  if(FILTRO){
+    const n = document.querySelectorAll('#companies .company').length;
+    document.getElementById('filtroTexto').innerHTML =
+      `Mostrando solo las habilitaciones <b>${FILTRO_LABEL[FILTRO]}</b> — ${n} empresa${n===1?'':'s'}.`;
+    aviso.classList.add('on');
+  } else {
+    aviso.classList.remove('on');
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- mails de renovacion ----------
+// Mismo molde que plantillaMailGH_ del backend de seguimiento de mediciones.
+const GH_VERDE = '#8dc63f', GH_VERDE_OSC = '#4a7a1e', GH_TINTA = '#2b2f26', GH_SUAVE = '#5b6058';
+
+// El equipo no va hardcodeado: este shell es publico. Lo manda el backend
+// una vez que el mail quedo validado contra la lista de autorizados.
+let EQUIPO = [];
+
+function filaMail(etiqueta, valor){
+  return `<tr>
+    <td style="padding:5px 12px 5px 0;color:${GH_SUAVE};font-size:13px;white-space:nowrap;">${escapeHtml(etiqueta)}</td>
+    <td style="padding:5px 0;color:${GH_TINTA};font-size:14px;font-weight:bold;">${escapeHtml(valor || '—')}</td>
+  </tr>`;
+}
+
+function marcoMail(titulo, bajada, cuerpo, pie){
+  return `
+  <div style="margin:0;padding:0;background:#f7f8f4;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f7f8f4;padding:18px 0;">
+  <tr><td align="center">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #dfe3da;border-radius:10px;overflow:hidden;">
+    <tr><td style="background:#ffffff;padding:18px 20px 14px;">
+      <img src="logo-gh.png" alt="GH Consultora" height="38" style="height:38px;width:auto;display:block;border:0;">
+      <div style="color:${GH_VERDE_OSC};font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-top:8px;">Gestión Ambiental</div>
+    </td></tr>
+    <tr><td style="background:${GH_VERDE_OSC};font-size:0;line-height:0;height:4px;">&nbsp;</td></tr>
+    <tr><td style="padding:20px;">
+      <div style="font-size:17px;font-weight:bold;color:${GH_TINTA};margin-bottom:2px;">${titulo}</div>
+      <div style="font-size:13px;color:${GH_SUAVE};margin-bottom:14px;">${bajada}</div>
+      ${cuerpo}
+    </td></tr>
+    <tr><td style="background:#f2f6ec;padding:12px 20px;border-top:1px solid #dfe3da;color:${GH_SUAVE};font-size:11.5px;">${pie}</td></tr>
+  </table></td></tr></table></div>`;
+}
+
+function datosMail(empresa, it){
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+      ${filaMail('Empresa', empresa)}
+      ${filaMail('Habilitación', it.label)}
+      ${filaMail('Expediente', it.expediente)}
+      ${filaMail('Resolución', it.resolucion)}
+      ${filaMail('Vence', fmtFecha(it.vencimiento) + (it.dias_venc!=null ? ` (en ${it.dias_venc} días)` : ''))}
+    </table>`;
+}
+
+// 1er mail (amarillo): va a todo el equipo, para que alguien se haga cargo.
+// Mismos botones que arma el backend, para que la vista previa no muestre
+// algo distinto de lo que realmente se envía.
+function botonesAsignar(){
+  return EQUIPO.filter(p => p.avisos).map(p =>
+    `<a href="#" style="display:inline-block;margin:0 6px 6px 0;padding:8px 12px;background:#ffffff;
+       border:1px solid ${GH_VERDE_OSC};color:${GH_VERDE_OSC};border-radius:6px;text-decoration:none;
+       font-size:12.5px;font-weight:bold;">${escapeHtml(p.nombre)}</a>`).join('');
+}
+
+function bloqueAsignar(titulo){
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:14px;">
+      <tr><td style="background:#eaf4e2;border-left:4px solid ${GH_VERDE_OSC};padding:12px 14px;">
+        <strong style="color:${GH_TINTA};font-size:14px;">${titulo}</strong>
+        <div style="margin-top:4px;color:${GH_SUAVE};font-size:12.5px;">
+          Al tocar un nombre queda anotado como responsable, y los avisos
+          siguientes le llegan solo a esa persona.</div>
+        <div style="margin-top:10px;">${botonesAsignar()}</div>
+      </td></tr>
+    </table>`;
+}
+
+function mailAsignacion(empresa, it){
+  const cuerpo = datosMail(empresa, it) +
+    bloqueAsignar('¿Quién se hace cargo de la renovación?');
+  return marcoMail(
+    'Renovación a definir responsable',
+    `Faltan ${it.dias_venc} días para que venza esta habilitación. Hay que definir quién gestiona la renovación.`,
+    cuerpo,
+    'Enviado automáticamente por el panel de vencimientos · 3 meses y 1 semana antes del vencimiento');
+}
+
+// 2do mail (naranja): solo al responsable ya asignado.
+function mailRenovacion(empresa, it){
+  const resp = it.responsable;
+  const cuerpo = datosMail(empresa, it) + `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top:18px;">
+      <tr><td style="background:#fbe6d2;border-left:4px solid #c56a15;padding:12px 14px;">
+        <strong style="color:${GH_TINTA};font-size:14px;">Hay que presentar la solicitud de renovación</strong>
+        <div style="margin-top:4px;color:${GH_SUAVE};font-size:12.5px;">
+          Quedan ${it.dias_venc} días. Cuando la presentes, subí la nueva habilitación al panel.</div>
+      </td></tr>
+    </table>` + (resp ? '' : bloqueAsignar('Todavía nadie se hizo cargo'));
+  return marcoMail(
+    'Presentar solicitud de renovación',
+    resp ? `${escapeHtml(resp)}, esta habilitación entra en los 3 meses previos al vencimiento.`
+         : 'Esta habilitación entra en los 3 meses previos al vencimiento.',
+    cuerpo,
+    resp ? `Enviado solo a ${escapeHtml(resp)}, responsable de esta gestión`
+         : 'Sin responsable asignado — se envía a quienes gestionan las renovaciones');
+}
+
+function verMail(empresa, it, tipo){
+  const overlay = document.getElementById('modalOverlay');
+  document.getElementById('modalCard').classList.add('ancho');
+  document.getElementById('modalTitulo').textContent =
+    tipo === 'asignacion' ? 'Mail: definir responsable' : 'Mail: solicitud de renovación';
+
+  // Antes esto era solo una vista previa y no había forma de mandarlo.
+  document.getElementById('modalLista').innerHTML = `
+    <div class="mail-acciones">
+      <button type="button" id="btnEnviarMail">${ico('sobre')} Enviar ahora</button>
+      <span id="mailEstado"></span>
+    </div>
+    <div id="mailPrev">${tipo === 'asignacion' ? mailAsignacion(empresa, it) : mailRenovacion(empresa, it)}</div>`;
+  document.getElementById('modalPie').style.display = 'none';
+  overlay.classList.add('on');
+
+  const btn = document.getElementById('btnEnviarMail');
+  const estado = document.getElementById('mailEstado');
+  btn.addEventListener('click', ()=>{
+    btn.disabled = true;
+    estado.textContent = 'Enviando…';
+    llamarBackend('mailRenovacion', {
+      tipo,
+      item: Object.assign({}, it, { empresa })
+      // La dirección del panel ya no se manda: la pone el backend, que es el
+      // único que la sabe bien (desde el navegador quedaba mal en los avisos
+      // automáticos y era un agujero para inyectar HTML en el mail).
+    }).then(r=>{
+      if(r.ok){
+        estado.textContent = 'Enviado a ' + (r.enviadoA || '').replace(/,/g, ', ');
+        estado.classList.add('ok');
+      } else {
+        btn.disabled = false;
+        estado.textContent = 'No se pudo enviar: ' + (r.detalle || r.error || '');
+      }
+    }).catch(()=>{
+      btn.disabled = false;
+      estado.textContent = 'No se pudo enviar. Probá de nuevo.';
+    });
+  });
+}
+
+// ---------- auditorias pendientes ----------
+// Pendiente = todo lo que no esta al dia. Se ordena de lo mas atrasado a lo menos.
+const ORDEN_PEND = { negro:0, rojo:1, naranja:2, amarillo:3, gris:4 };  // 'verde' y 'porconfirmar' quedan afuera
+const PEND_TITULO = {
+  negro:'Se pasaron del mes', rojo:'Cumplieron el mes',
+  naranja:'Falta 1 semana', amarillo:'Faltan 2 semanas', gris:'Sin auditoría registrada'
+};
+const PEND_EMOJI = { negro:'⚫', rojo:'🔴', naranja:'🟠', amarillo:'🟡', gris:'⚪' };
+
+function auditoriasPendientes(){
+  return window.PAYLOAD.empresas
+    .filter(e => e.auditoria && ORDEN_PEND[e.auditoria.estado] !== undefined)
+    .map(e => ({ empresa:e.empresa, ...e.auditoria }))
+    .sort((a,b)=>
+      ORDEN_PEND[a.estado] - ORDEN_PEND[b.estado] ||
+      (b.dias ?? -1) - (a.dias ?? -1) ||
+      a.empresa.localeCompare(b.empresa));
+}
+
+function abrirPendientes(){
+  document.getElementById('modalCard').classList.remove('ancho');
+  document.getElementById('modalPie').style.display = '';
+  const pend = auditoriasPendientes();
+  const cont = document.getElementById('modalLista');
+  document.getElementById('modalTitulo').textContent =
+    `Auditorías por realizar (${pend.length})`;
+
+  if(!pend.length){
+    cont.innerHTML = '<div class="empty-hint">No hay auditorías pendientes.</div>';
+  } else {
+    let html = '', grupoActual = null;
+    pend.forEach(a=>{
+      if(a.estado !== grupoActual){
+        if(grupoActual !== null) html += '</div>';
+        grupoActual = a.estado;
+        html += `<div class="pend-grupo">${PEND_TITULO[a.estado]}</div><div class="pend-card">`;
+      }
+      const det = a.ultima
+        ? `${fmtFecha(a.ultima)} · hace ${a.dias} días`
+        : 'sin fecha registrada';
+      html += `<div class="pend">
+                 <span class="pt" style="background:var(--${a.estado})"></span>
+                 <span class="nom">${escapeHtml(a.empresa)}</span>
+                 <span class="det">${det}</span>
+               </div>`;
+    });
+    if(grupoActual !== null) html += '</div>';
+    cont.innerHTML = html;
+  }
+  document.getElementById('modalOverlay').classList.add('on');
+}
+
+function textoParaWhatsapp(){
+  const pend = auditoriasPendientes();
+  const hoy = fmtFecha(HOY.toISOString().slice(0,10));
+  let txt = `*Auditorías ambientales pendientes*\n_Al ${hoy} — ${pend.length} empresas_\n`;
+  let grupoActual = null;
+  pend.forEach(a=>{
+    if(a.estado !== grupoActual){
+      grupoActual = a.estado;
+      txt += `\n${PEND_EMOJI[a.estado]} *${PEND_TITULO[a.estado]}*\n`;
+    }
+    txt += a.ultima
+      ? `• ${a.empresa} — última ${fmtFecha(a.ultima)} (hace ${a.dias} días)\n`
+      : `• ${a.empresa} — sin fecha registrada\n`;
+  });
+  return txt;
+}
+
+function iniciales(nombre){
+  return nombre.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+}
+
+function fmtFecha(iso){
+  if(!iso) return null;
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function peorEstado(items){
+  const orden = {rojo:0, naranja:1, amarillo:2, verde:3, gris:4};
+  let peor = 'gris', hayDato = false;
+  items.forEach(it=>{
+    if(it.nivel!==1) return;
+    if(it.estado_semaforo !== 'gris') hayDato = true;
+    if(orden[it.estado_semaforo] < orden[peor]) peor = it.estado_semaforo;
+  });
+  return {peor, hayDato};
+}
+
+function contarPorEstado(empresas){
+  const c = {rojo:0, naranja:0, amarillo:0, verde:0, gris:0};
+  empresas.forEach(emp=>{
+    emp.items.filter(i=>i.nivel===1).forEach(it=>{ c[it.estado_semaforo]++; });
+  });
+  return c;
+}
+
+function iconoUpload(strip, input, alAplicar){
+  strip.addEventListener('click', ()=> input.click());
+  input.addEventListener('change', ()=>{ if(input.files.length) alAplicar(input.files[0].name); });
+}
+
+// Semaforo de auditorias: ciclo mensual. Rojo cubre la primera semana de atraso (30-36).
+function estadoAuditoria(dias, esporadica){
+  if(dias === null || dias === undefined) return 'gris';
+  if(esporadica) return 'esporadica';
+  if(dias <= 15) return 'verde';
+  if(dias <= 22) return 'amarillo';
+  if(dias <= 29) return 'naranja';
+  if(dias <= 36) return 'rojo';
+  return 'negro';
+}
+
+const AUD_LABEL = {
+  verde:'Al día', amarillo:'Faltan 2 semanas', naranja:'Falta 1 semana',
+  rojo:'Cumplió el plazo', negro:'Se pasó del plazo', gris:'Sin auditoría registrada',
+  porconfirmar:'Frecuencia a confirmar'
+};
+
+/* Los recuadros se dibujan agrupados (Predio, Transporte, Hidráulica, y
+   después municipalidad/bomberos), en un orden que NO es el de la planilla,
+   y encima el filtro por estado puede esconder algunos. Por eso cada recuadro
+   lleva su número de fila en el HTML y se lo busca por ahí: ubicarlo por
+   posición devolvía otra habilitación, y las fechas terminaban escritas en la
+   fila equivocada del Sheets. */
+function itemDeTile(emp, tile){
+  if(!tile) return null;
+  const fila = Number(tile.dataset.fila);
+  return emp.items.find(i => i.fila === fila) || null;
+}
+
+function tileHtml(it){
+  const vencLine = it.vencimiento
+    ? `<div class="tile-venc editable badge ${it.estado_semaforo}" title="Tocá para modificar las fechas">${fmtFecha(it.vencimiento)}${it.venc_inferida ? ' *' : ''}</div>`
+    : `<div class="tile-venc editable badge gris" title="Tocá para cargar el vencimiento">Sin vencimiento cargado</div>`;
+  const estadoTxt = it.estado_texto ? `<div class="tile-estado-txt">${escapeHtml(it.estado_texto)}</div>` : '';
+
+  // Accion que dispara el sistema segun la banda del semaforo.
+  const dv = it.dias_venc;
+  let avisoMail = '';
+  if(it.estado_semaforo === 'naranja'){
+    avisoMail = `<div class="aviso-mail naranja">${ico('sobre')} <span>Presentar solicitud de renovación${dv!=null?` — faltan ${dv} días`:''}</span>
+                   <button type="button" class="ver-mail" data-tipo="renovacion">Ver mail</button></div>`;
+  } else if(it.estado_semaforo === 'amarillo'){
+    avisoMail = `<div class="aviso-mail amarillo">${ico('sobre')} <span>Definir responsable de la renovación${dv!=null?` — faltan ${dv} días`:''}</span>
+                   <button type="button" class="ver-mail" data-tipo="asignacion">Ver mail</button></div>`;
+  }
+  // Solo muestra quién se hizo cargo. La asignación se hace tocando el nombre
+  // en el mail, no acá.
+  const respLinea = it.responsable
+    ? `<div class="resp">${ico('persona')} Responsable: ${escapeHtml(it.responsable)}</div>` : '';
+
+  // La resolucion es el documento real de la habilitacion: si tiene link, va visible.
+  const resLink = (it.resolucion && it.resolucion_url)
+    ? `<a class="doc-link" href="${escapeHtml(it.resolucion_url)}" target="_blank" rel="noopener">${ico('doc')}${escapeHtml(it.resolucion)}</a>`
+    : '';
+
+  const extra = [];
+  if(it.resolucion && !it.resolucion_url) extra.push(`<div><b>Resolución:</b> ${escapeHtml(it.resolucion)} <i>(sin archivo vinculado)</i></div>`);
+  if(it.otorgada) extra.push(`<div><b>Otorgada:</b> ${fmtFecha(it.otorgada)}</div>`);
+  if(it.organismo) extra.push(`<div><b>Organismo:</b> ${escapeHtml(it.organismo)}</div>`);
+  if(it.evaluador) extra.push(`<div><b>Evaluador:</b> ${escapeHtml(it.evaluador)}</div>`);
+  if(it.pago) extra.push(`<div><b>Pago:</b> ${escapeHtml(it.pago)}</div>`);
+  if(it.deuda) extra.push(`<div><b>Deuda:</b> ${escapeHtml(it.deuda)}</div>`);
+  extra.push(
+    `<div><b>Estado</b>
+       <textarea class="obs-edit" data-campo="estado" placeholder="Sin estado cargado. Escribí acá para actualizar...">${escapeHtml(it.estado_texto || '')}</textarea>
+       <div class="obs-guardado">Guardado</div>
+     </div>`);
+  extra.push(
+    `<div><b>Observaciones</b>
+       <textarea class="obs-edit" data-campo="observaciones" placeholder="Sin observaciones. Escribí acá para agregar...">${escapeHtml(it.observaciones || '')}</textarea>
+       <div class="obs-guardado">Guardado</div>
+     </div>`);
+
+  return `<div class="tile" data-fila="${it.fila}">
+    <div class="tile-top">
+      <span class="tile-label">${escapeHtml(it.label)}</span>
+      ${it.grupo && it.grupo !== '—' ? `<span class="tipo-chip">${escapeHtml(it.grupo)}</span>` : ''}
+    </div>
+    <div class="exp-row">
+      <span class="tile-exp">${it.expediente ? 'Exp. ' + escapeHtml(it.expediente) : 'Sin expediente'}</span>
+      <button type="button" class="btn-hab" title="Subir la habilitación renovada">${ico('arriba')}</button>
+      <button type="button" class="btn-hab btn-fechas" title="Cargar o modificar las fechas" aria-label="Cargar o modificar las fechas">${ico('calendario')}</button>
+      ${it.ultima_subida ? `<button type="button" class="btn-hab btn-deshacer"
+         title="Deshacer la subida de «${escapeHtml(it.ultima_subida.nombre)}» — el archivo va a la papelera de Drive"
+         aria-label="Deshacer última subida">${ico('deshacer')}</button>` : ''}
+      <input type="file" class="hab-input" hidden accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+    </div>
+    ${vencLine}
+    ${resLink}
+    ${avisoMail}
+    ${respLinea}
+    ${estadoTxt}
+    ${extra.length ? `<div class="tile-extra">${extra.join('')}</div>` : ''}
+  </div>`;
+}
+
+function auditoriaHtml(a, carpetas){
+  // Acá va SOLO la carpeta de auditorías. Predio tiene su propio botón en el
+  // encabezado del grupo "Ambiente · Predio", así que tenerlo también acá era
+  // el mismo acceso repetido dos veces en la misma tarjeta.
+  const btnAuditoria = carpetas && carpetas.auditoria
+    ? `<a class="folder-btn" href="${escapeHtml(carpetas.auditoria)}" target="_blank" rel="noopener" title="Carpeta de auditorías ambientales" aria-label="Carpeta de auditorías ambientales">${ico('carpetaAud')}</a>` : '';
+
+  // Empresas que no figuran en la planilla de visitas técnicas: no tienen
+  // fecha ni ciclo, pero sí tienen carpeta de auditorías. La franja se dibuja
+  // igual, en gris, para que el acceso a la carpeta esté siempre en el mismo
+  // lugar en las 24 tarjetas. Sin botón de subir: no hay fila donde anotar la
+  // fecha, así que subir un informe fallaría.
+  if(!a){
+    return `
+      <div class="auditoria gris">
+        <div class="aud-main">
+          <div class="info">
+            <span class="k">Auditoría ambiental</span>
+            <span class="fecha">Sin visitas registradas</span>
+          </div>
+          <div class="aud-acciones">
+            ${btnAuditoria}
+            <button type="button" class="btn-aud-mas" title="Sumarla a la planilla de visitas y definir cada cuántos meses se hace el recorrido">${ico('mas')} Incluir en recorridos</button>
+          </div>
+        </div>
+        <span class="nota">No figura en la planilla de visitas técnicas. Con «Incluir en recorridos» queda en la lista y le definís cada cuántos meses se hace.</span>
+      </div>`;
+  }
+
+  const estado = a.estado;
+  const fecha = a.ultima ? fmtFecha(a.ultima) : 'Sin registrar';
+  const dias = (a.dias === null || a.dias === undefined) ? '' :
+    `<span class="dias">hace ${a.dias} días · ${AUD_LABEL[estado]}</span>`;
+  // Sin el "·" adelante: en pantalla ancha los separa el gap del flex, y en
+  // teléfono, cuando cae en su propio renglón, quedaba un punto suelto.
+  const frec = `<span class="frec"><button type="button" class="frec-edit" title="Cambiar cada cuántos meses se hace el recorrido">${a.frecuencia}</button>${a.proxima ? ' · próxima ' + fmtFecha(a.proxima) : ''}</span>`;
+  const nota = a.nota ? `<span class="nota">${escapeHtml(a.nota)}</span>` : '';
+  // El link puede venir de la celda (subida reciente, con el nota_url que
+  // guarda setAuditoria_) o, para subidas de antes de tener ese campo,
+  // del registro de "última subida" que sí conserva el id de Drive. Así el
+  // botón abre el último informe sin importar cuándo se subió.
+  const urlUltimoInforme = a.nota_url || (a.ultima_subida && a.ultima_subida.url) || null;
+  const btnAbrirInforme = urlUltimoInforme
+    ? `<a class="folder-btn" href="${escapeHtml(urlUltimoInforme)}" target="_blank" rel="noopener" title="Abrir el último informe" aria-label="Abrir el último informe">${ico('doc')}</a>` : '';
+  return `
+    <div class="auditoria ${estado}">
+      <div class="aud-main">
+        <div class="info">
+          <span class="k">Auditoría ambiental</span>
+          <span class="fecha">${fecha}</span>
+          ${dias}
+          ${frec}
+        </div>
+        <div class="aud-acciones">
+          ${btnAuditoria}
+          ${btnAbrirInforme}
+          <button type="button" class="btn-subir" title="Marcar el informe en la carpeta de auditorías">${ico('doc')} Elegir informe</button>
+        </div>
+      </div>
+      ${nota}
+    </div>`;
+}
+
+function render(empresas){
+  const c = contarPorEstado(empresas);
+  const stats = document.getElementById('stats');
+  const def = [
+    ['rojo','Vencidas'], ['naranja','Faltan ≤ 3 meses'], ['amarillo','3 meses + 1 semana'],
+    ['verde','Vigentes'], ['gris','Sin fecha'],
+  ];
+  stats.innerHTML = def.map(([k,label])=>
+    `<button type="button" class="stat ${k}${FILTRO===k?' on':''}" data-estado="${k}">
+       <div class="n">${c[k]}</div><div class="l">${label}</div>
+     </button>`).join('');
+  stats.querySelectorAll('.stat').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const e = b.dataset.estado;
+      FILTRO = (FILTRO === e) ? null : e;   // volver a clickear lo apaga
+      aplicar();
+    });
+  });
+
+  const cont = document.getElementById('companies');
+  // Un refresco automático no tiene que cerrarle a nadie lo que tenía abierto
+  // ni saltarle el scroll: se anota qué empresas tenían desplegado
+  // "Municipalidad y bomberos" / "Info adicional" y se restituye al redibujar.
+  const abiertas = { n2:new Set(), n3:new Set() };
+  cont.querySelectorAll('.company').forEach(c=>{
+    const nom = c.dataset.empresa;
+    if(!nom) return;
+    if(c.classList.contains('show-n2')) abiertas.n2.add(nom);
+    if(c.classList.contains('show-n3')) abiertas.n3.add(nom);
+  });
+  const scrollPrevio = window.scrollY;
+  cont.innerHTML = '';
+
+  empresas.forEach(emp=>{
+    let n1 = emp.items.filter(i=>i.nivel===1);
+    // Si hay un filtro activo, la empresa muestra solo los casos de ese estado.
+    if(FILTRO){
+      n1 = n1.filter(i=>i.estado_semaforo === FILTRO);
+      if(!n1.length) return;   // empresa sin casos de ese estado: no se muestra
+    }
+    const n2 = emp.items.filter(i=>i.nivel===2);
+    const {peor, hayDato} = peorEstado(n1);
+    const carpetas = emp.carpetas || {};
+
+    // Tres columnas: Ambiente se parte en Predio y Transporte; Hidraulica aparte.
+    const cols = [
+      ['Ambiente · Predio',     'ambiente',   n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='PREDIO'), carpetas.predio],
+      ['Ambiente · Transporte', 'transporte', n1.filter(i=>i.organismo_grupo!=='HIDRÁULICA' && i.sub_grupo==='TRANSPORTE'), carpetas.transporte],
+      ['Hidráulica',            'hidraulica', n1.filter(i=>i.organismo_grupo==='HIDRÁULICA'), carpetas.hidraulica],
+    ].filter(([,,items])=>items.length);
+
+    const gruposHtml = cols.length
+      ? `<div class="organismos">
+           ${cols.map(([label,cls,items,folderUrl])=>`
+             <div class="org-col" style="flex-grow:${Math.min(items.length,3)}">
+               <div class="org-label ${cls}">${label} <span class="cant">(${items.length})</span>
+                 ${folderUrl ? `<a class="folder-btn" href="${escapeHtml(folderUrl)}" target="_blank" rel="noopener" title="Carpeta en Drive" aria-label="Carpeta en Drive">${ico('carpeta')}</a>` : ''}
+               </div>
+               <div class="tiles">${items.map(tileHtml).join('')}</div>
+             </div>`).join('')}
+         </div>`
+      : `<div class="empty-hint">Sin habilitaciones cruciales cargadas.</div>`;
+
+    const n2Html = n2.length
+      ? `<div class="tiles">${n2.map(tileHtml).join('')}</div>`
+      : `<div class="empty-hint">Sin habilitaciones municipales / bomberos cargadas.</div>`;
+
+    const badgeLabel = !hayDato ? 'Sin fechas cargadas'
+      : peor === 'rojo' ? 'Tiene vencidas'
+      : peor === 'naranja' ? 'Vence pronto (≤60d)'
+      : peor === 'amarillo' ? 'Vence en ≤90d'
+      : 'Al día';
+
+    const card = document.createElement('div');
+    card.className = 'company' + (emp.pausada ? ' paused' : '')
+      + (abiertas.n2.has(emp.empresa) ? ' show-n2' : '')
+      + (abiertas.n3.has(emp.empresa) ? ' show-n3' : '');
+    card.dataset.empresa = emp.empresa;
+    card.innerHTML = `
+      <div class="company-head">
+        <div class="company-title">
+          ${emp.logo
+            ? `<img class="logo-emp" src="${escapeHtml(emp.logo)}" alt="${escapeHtml(emp.empresa)}">`
+            : `<div class="logo-fallback">${escapeHtml(iniciales(emp.empresa))}</div>`}
+          <h2>${escapeHtml(emp.empresa)}</h2>
+        </div>
+        <div class="company-summary">
+          ${carpetas.carpeta ? `<a class="folder-btn" href="${escapeHtml(carpetas.carpeta)}" target="_blank" rel="noopener" title="Carpeta de la empresa en Drive" aria-label="Carpeta de la empresa en Drive">${ico('carpeta')}</a>` : ''}
+          <button type="button" class="folder-btn btn-actualizar-carpetas" title="Volver a buscar las carpetas de esta empresa" aria-label="Actualizar carpetas">${ico('refrescar')}</button>
+          ${emp.pausada
+            ? `<span class="badge gris"><span class="dot gris"></span>Servicio pausado</span>`
+            : `<span class="badge ${peor}"><span class="dot ${peor}"></span>${badgeLabel}</span>`}
+        </div>
+      </div>
+      <div class="company-body">${gruposHtml}</div>
+      <div class="toggles">
+        <button class="toggle-btn btn-n2" type="button">Municipalidad y bomberos <span class="chev">${ico('chevron')}</span></button>
+        <button class="toggle-btn btn-n3" type="button">Info adicional <span class="chev">${ico('chevron')}</span></button>
+        <button class="btn-pausa" type="button">${emp.pausada
+          ? ico('play') + ' Reanudar servicio'
+          : ico('pausa') + ' Pausar servicio'}</button>
+      </div>
+      <div class="nivel2">${n2Html}</div>
+      <div class="nivel3">
+        <div class="datos-empresa">
+          <div class="campo"><div class="k">CUIT</div>
+            <div class="v ${emp.cuit?'':'empty'}" data-campo="cuit" title="Doble clic para editar">${escapeHtml(emp.cuit || 'sin cargar')}</div>
+            <div class="pista">Enter para guardar · Esc para cancelar</div></div>
+          <div class="campo"><div class="k">Contacto</div>
+            <div class="v ${emp.contacto?'':'empty'}" data-campo="contacto" title="Doble clic para editar">${escapeHtml(emp.contacto || 'sin cargar')}</div>
+            <div class="pista">Enter para guardar · Esc para cancelar</div></div>
+        </div>
+      </div>
+      ${auditoriaHtml(emp.auditoria, carpetas)}
+    `;
+
+    card.querySelector('.btn-n2').addEventListener('click', ()=>{
+      card.classList.toggle('show-n2');
+      card.querySelector('.btn-n2').classList.toggle('active');
+    });
+    card.querySelector('.btn-n3').addEventListener('click', ()=>{
+      card.classList.toggle('show-n3');
+      card.querySelector('.btn-n3').classList.toggle('active');
+    });
+    if(card.classList.contains('show-n2')) card.querySelector('.btn-n2').classList.add('active');
+    if(card.classList.contains('show-n3')) card.querySelector('.btn-n3').classList.add('active');
+
+    // Vuelve a buscar Predio/Transporte/Hidráulica/Auditorías de esta
+    // empresa por si le crearon o renombraron carpetas en Drive.
+    const btnActualizarCarpetas = card.querySelector('.btn-actualizar-carpetas');
+    btnActualizarCarpetas.addEventListener('click', ()=>{
+      btnActualizarCarpetas.classList.add('girando');
+      btnActualizarCarpetas.disabled = true;
+      llamarBackend('actualizarCarpetas', { empresa: emp.empresa }).then(r=>{
+        if(r.ok){
+          emp.carpetas = r.carpetas;
+          aplicar();
+        } else {
+          btnActualizarCarpetas.classList.remove('girando');
+          btnActualizarCarpetas.disabled = false;
+        }
+      }).catch(()=>{
+        btnActualizarCarpetas.classList.remove('girando');
+        btnActualizarCarpetas.disabled = false;
+      });
+    });
+
+    // CUIT y contacto: doble clic para editar, Enter guarda, Esc cancela.
+    card.querySelectorAll('.datos-empresa .v').forEach(celda=>{
+      const campo = celda.dataset.campo;
+      const pista = celda.parentElement.querySelector('.pista');
+      let previo = null;
+
+      celda.addEventListener('dblclick', ()=>{
+        if(celda.isContentEditable) return;
+        previo = emp[campo] || '';
+        celda.textContent = previo;
+        celda.classList.remove('empty');
+        celda.contentEditable = 'true';
+        pista.classList.add('on');
+        celda.focus();
+        document.getSelection().selectAllChildren(celda);
+      });
+
+      function cerrar(guardar){
+        if(!celda.isContentEditable) return;
+        const valor = celda.textContent.trim();
+        celda.contentEditable = 'false';
+        pista.classList.remove('on');
+        if(guardar && valor !== previo){
+          emp[campo] = valor;
+          // Si el backend rechaza el cambio, la celda vuelve a lo que había:
+          // antes solo se revertía cuando fallaba la red, así que un rechazo
+          // dejaba en pantalla un valor que no se había guardado.
+          const revertir = ()=>{
+            emp[campo] = previo;
+            celda.textContent = previo || 'sin cargar';
+            celda.classList.toggle('empty', !previo);
+          };
+          llamarBackend('setDatoEmpresa', { fila: emp.fila, campo, valor, empresa: emp.empresa })
+            .then(r=>{
+              if(r.ok) return;
+              revertir();
+              if(!planillaCambio(r)) avisoBarra('No se pudo guardar el cambio.');
+            })
+            .catch(revertir);
+        } else if(!guardar){
+          emp[campo] = previo;
+        }
+        const v = emp[campo];
+        celda.textContent = v || 'sin cargar';
+        celda.classList.toggle('empty', !v);
+      }
+
+      celda.addEventListener('keydown', e=>{
+        if(e.key === 'Enter'){ e.preventDefault(); cerrar(true); }
+        if(e.key === 'Escape'){ e.preventDefault(); cerrar(false); }
+      });
+      celda.addEventListener('blur', ()=> cerrar(true));
+    });
+
+    // Preview del mail que dispara cada aviso.
+    card.querySelectorAll('.ver-mail').forEach((btn, i)=>{
+      btn.addEventListener('click', ()=>{
+        const it = itemDeTile(emp, btn.closest('.tile'));
+        if(!it) return;
+        verMail(emp.empresa, it, btn.dataset.tipo);
+
+        // En el mail de asignacion, tocar un nombre lo deja anotado en la habilitacion.
+        document.querySelectorAll('#mailPrev a').forEach(a=>{
+          a.addEventListener('click', ev=>{
+            ev.preventDefault();
+            // Antes esto solo pintaba el nombre en pantalla y se perdía al
+            // refrescar: ahora queda escrito en la planilla.
+            const nombre = a.textContent.trim();
+            document.getElementById('modalOverlay').classList.remove('on');
+            llamarBackend('setResponsable', { fila: it.fila, responsable: nombre, empresa: emp.empresa })
+              .then(()=> cargarDatos()).catch(()=>{});
+          });
+        });
+      });
+    });
+
+    // Habilitación renovada: se elige el archivo, se elige a qué carpeta de
+    // esa empresa va, lo sube el backend, y después se carga el vencimiento
+    // (que es lo que el panel necesita para recalcular el semáforo).
+    // Bloque donde se arma el formulario de fechas de una habilitación.
+    function bloqueHab(tile, fila){
+      let ok = tile.querySelector('.hab-nueva');
+      if(!ok){
+        ok = document.createElement('div');
+        ok.className = 'hab-nueva';
+        fila.insertAdjacentElement('afterend', ok);
+      }
+      return ok;
+    }
+
+    // Formulario de otorgada/vencimiento. Se usa después de subir un archivo y
+    // también solo, para cargar o corregir las fechas de cualquier habilitación.
+    function pedirFechasEn(ok, it, lineaHtml, textoAviso){
+      ok.innerHTML = lineaHtml + `
+        <div class="linea">${textoAviso}</div>
+        <div class="fechas-renovacion">
+          <label>Otorgada <input type="date" class="fecha-otorgada" value="${it.otorgada || ''}"></label>
+          <label>Vence <input type="date" class="fecha-vencimiento" value="${it.vencimiento || ''}" required></label>
+          <button type="button" class="btn-guardar-fechas">Guardar fechas</button>
+          <button type="button" class="sec btn-cerrar-form">Cerrar</button>
+          <span class="fechas-guardado">Guardado</span>
+        </div>`;
+      ok.querySelector('.btn-cerrar-form').addEventListener('click', ()=> ok.remove());
+      const btnGuardar = ok.querySelector('.btn-guardar-fechas');
+      btnGuardar.addEventListener('click', ()=>{
+        const otorgada = ok.querySelector('.fecha-otorgada').value;
+        const vencimiento = ok.querySelector('.fecha-vencimiento').value;
+        if(!vencimiento){ avisoBarra('Falta la fecha de vencimiento.'); return; }
+        btnGuardar.disabled = true;
+        llamarBackend('setFechas', { fila: it.fila, otorgada, vencimiento, empresa: emp.empresa }).then(res=>{
+          btnGuardar.disabled = false;
+          if(res.ok){
+            ok.querySelector('.fechas-guardado').classList.add('on');
+            cargarDatos();
+          } else if(!planillaCambio(res)){
+            // Antes, si el guardado fallaba no pasaba nada en pantalla:
+            // la persona se quedaba creyendo que la fecha quedó cargada.
+            avisoBarra('No se pudieron guardar las fechas.');
+          }
+        }).catch(()=>{
+          btnGuardar.disabled = false;
+          avisoBarra('No se pudieron guardar las fechas.');
+        });
+      });
+    }
+
+    card.querySelectorAll('.exp-row').forEach(fila=>{
+      const input = fila.querySelector('.hab-input');
+
+      // Cargar o corregir las fechas sin subir ningún archivo: sirve para las
+      // habilitaciones sin vencimiento cargado y para cualquier corrección.
+      function abrirEdicionFechas(){
+        const tile = fila.closest('.tile');
+        const it = itemDeTile(emp, tile);
+        if(!it) return;
+        pedirFechasEn(bloqueHab(tile, fila), it, '', it.vencimiento
+          ? 'Modificá las fechas de la habilitación.'
+          : '<b>Sin vencimiento cargado.</b> Completalo para que el semáforo se actualice.');
+      }
+      fila.querySelector('.btn-fechas').addEventListener('click', abrirEdicionFechas);
+      const badgeVenc = fila.closest('.tile').querySelector('.tile-venc.editable');
+      if(badgeVenc) badgeVenc.addEventListener('click', abrirEdicionFechas);
+      fila.querySelector('.btn-hab').addEventListener('click', ()=> input.click());
+
+      // Deshacer: manda solo la fila, nunca el id del archivo. El backend sabe
+      // cuál fue la última subida de esa fila y la manda a la papelera.
+      const btnDeshacer = fila.querySelector('.btn-deshacer');
+      if(btnDeshacer){
+        btnDeshacer.addEventListener('click', ()=>{
+          const it = itemDeTile(emp, fila.closest('.tile'));
+          if(!it) return;
+          btnDeshacer.disabled = true;
+          btnDeshacer.classList.add('girando');
+          llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila, empresa: emp.empresa }).then(r=>{
+            if(r.ok) return cargarDatos();
+            btnDeshacer.disabled = false;
+            btnDeshacer.classList.remove('girando');
+          }).catch(()=>{
+            btnDeshacer.disabled = false;
+            btnDeshacer.classList.remove('girando');
+          });
+        });
+      }
+
+      input.addEventListener('change', ()=>{
+        if(!input.files.length) return;
+        const file = input.files[0];
+        input.value = '';   // permite volver a elegir el mismo archivo si hay que reintentar
+
+        const tile = fila.closest('.tile');
+        const it = itemDeTile(emp, tile);
+        if(!it) return;
+
+        const ok = bloqueHab(tile, fila);
+
+        // Formulario de fechas, que se muestra una vez subido el archivo.
+        function pedirFechas(lineaHtml){
+          pedirFechasEn(ok, it, lineaHtml,
+            '<b>Falta cargar el vencimiento</b> de la nueva habilitación para que el semáforo se actualice.');
+        }
+
+        if(file.size > MAX_SUBIDA_MB * 1024 * 1024){
+          ok.innerHTML = `<div class="linea">El archivo pesa más de ${MAX_SUBIDA_MB} MB.
+            Subilo directo en Drive${carpetas.carpeta
+              ? ' — <a class="doc-link" href="' + escapeHtml(carpetas.carpeta) + '" target="_blank" rel="noopener">abrir carpeta</a>'
+              : ''}.</div>`;
+          return;
+        }
+
+        const destinos = carpetasDestino(carpetas);
+        if(!destinos.length){
+          ok.innerHTML = '<div class="linea">No tengo la carpeta de esta empresa en Drive.</div>';
+          return;
+        }
+
+        ok.innerHTML = `
+          <div class="linea">${escapeHtml(file.name)}</div>
+          <div class="fechas-renovacion">
+            <label>Guardar en
+              <select class="carpeta-destino">
+                ${destinos.map(([n,id])=>`<option value="${escapeHtml(id)}">${escapeHtml(n)}</option>`).join('')}
+              </select>
+            </label>
+            <button type="button" class="btn-confirmar-subida">Subir</button>
+          </div>`;
+
+        const btnSubir = ok.querySelector('.btn-confirmar-subida');
+        btnSubir.addEventListener('click', ()=>{
+          const carpetaId = ok.querySelector('.carpeta-destino').value;
+          btnSubir.disabled = true;
+          ok.querySelector('.linea').textContent = 'Subiendo ' + file.name + '…';
+          subirAlBackend(file, { carpetaId, empresa: emp.empresa, tipo:'hab', fila: it.fila }).then(r=>{
+            if(!r.ok){
+              ok.innerHTML = '<div class="linea">No se pudo subir: ' +
+                escapeHtml(r.detalle || r.error) + '</div>';
+              return;
+            }
+            if(r.enlazado === false) avisoBarra('El archivo se subió, pero no pude enlazarlo en la planilla.', 5000);
+            pedirFechas('<div class="linea">' + ico('check') + ' Guardado en ' +
+              escapeHtml(r.carpeta) + ' — <a class="doc-link" href="' + escapeHtml(r.url) +
+              '" target="_blank" rel="noopener">ver</a>' +
+              '<button type="button" class="btn-hab btn-deshacer btn-deshacer-recien" ' +
+              'title="Deshacer esta subida — el archivo va a la papelera de Drive" ' +
+              'aria-label="Deshacer esta subida">' + ico('deshacer') + '</button></div>');
+
+            // Deshacer sin salir del paso: la tarjeta todavía no se redibujó,
+            // así que el botón de la fila de arriba aún no existe.
+            const btnRecien = ok.querySelector('.btn-deshacer-recien');
+            btnRecien.addEventListener('click', ()=>{
+              btnRecien.disabled = true;
+              btnRecien.classList.add('girando');
+              llamarBackend('deshacerSubida', { tipo:'hab', fila: it.fila, empresa: emp.empresa }).then(res=>{
+                if(res.ok){
+                  ok.innerHTML = '<div class="linea">Subida deshecha. El archivo quedó en la papelera de Drive.</div>';
+                  return;
+                }
+                btnRecien.disabled = false;
+                btnRecien.classList.remove('girando');
+              }).catch(()=>{
+                btnRecien.disabled = false;
+                btnRecien.classList.remove('girando');
+              });
+            });
+          }).catch(()=>{
+            ok.innerHTML = '<div class="linea">No se pudo subir. Probá de nuevo.</div>';
+          });
+        });
+      });
+    });
+
+    // Pausa del servicio: deja toda la tarjeta en gris. Se guarda en la
+    // columna SERVICIO PAUSADO de la planilla, así sobrevive a cerrar el
+    // panel y la ven todos, no solo quien la pausó.
+    const btnPausa = card.querySelector('.btn-pausa');
+    btnPausa.addEventListener('click', ()=>{
+      const pausada = !emp.pausada;
+      btnPausa.disabled = true;
+      llamarBackend('setPausa', { empresa: emp.empresa, pausada }).then(r=>{
+        if(r.ok){
+          emp.pausada = pausada;   // aplicar() vuelve a dibujar la tarjeta
+          aplicar();
+        } else {
+          btnPausa.disabled = false;
+          btnPausa.title = 'No se pudo guardar, probá de nuevo';
+        }
+      }).catch(()=>{
+        btnPausa.disabled = false;
+        btnPausa.title = 'No se pudo guardar, probá de nuevo';
+      });
+    });
+
+    // Estado y observaciones: se escriben en la planilla, en la fila de esa
+    // habilitación. Va con un respiro de 900 ms para no mandar una consulta
+    // por tecla, y el cartelito solo dice "Guardado" cuando el backend
+    // confirmó — antes aparecía siempre, aunque no se guardara nada.
+    card.querySelectorAll('.obs-edit').forEach(ta=>{
+      const aviso = ta.parentElement.querySelector('.obs-guardado');
+      const it = itemDeTile(emp, ta.closest('.tile'));
+      const campo = ta.dataset.campo;
+      if(!it || !campo) return;
+      let t;
+      ta.addEventListener('input', ()=>{
+        clearTimeout(t);
+        t = setTimeout(()=>{
+          const valor = ta.value;
+          aviso.textContent = 'Guardando…';
+          aviso.classList.add('on');
+          llamarBackend('setCampo', { fila: it.fila, campo, valor, empresa: emp.empresa }).then(r=>{
+            if(r.ok){
+              if(campo === 'estado') it.estado_texto = valor; else it.observaciones = valor;
+              aviso.textContent = 'Guardado';
+              setTimeout(()=> aviso.classList.remove('on'), 1600);
+            } else {
+              aviso.textContent = planillaCambio(r) ? 'La planilla cambió' : 'No se pudo guardar';
+            }
+          }).catch(()=>{ aviso.textContent = 'No se pudo guardar'; });
+        }, 900);
+      });
+    });
+
+    // Recorridos: sumar la empresa a la lista de visitas o cambiar cada cuántos
+    // meses se hace. Es el mismo cuadrito para las dos cosas.
+    (function(){
+      const stripR = card.querySelector('.auditoria');
+      if(!stripR) return;
+      const btnMas = stripR.querySelector('.btn-aud-mas');
+      const btnFrec = stripR.querySelector('.frec-edit');
+      if(!btnMas && !btnFrec) return;
+
+      function formularioMeses(titulo, inicial, guardar){
+        let box = stripR.querySelector('.aud-nueva');
+        if(!box){ box = document.createElement('div'); box.className = 'aud-nueva'; stripR.appendChild(box); }
+        box.innerHTML = `
+          <div class="linea">${titulo}<button type="button" class="cerrar">Cerrar</button></div>
+          <div class="fechas-renovacion">
+            <label>Recorrido cada <input type="number" class="meses-aud" min="1" max="24" step="1" value="${inicial}"> meses</label>
+            <button type="button" class="btn-guardar-meses">Guardar</button>
+            <span class="fechas-guardado">Guardado</span>
+          </div>
+          <div class="linea" style="font-weight:400">Ejemplos: 1 = mensual · 3 = trimestral · 6 = semestral · 12 = anual.</div>`;
+        box.querySelector('.cerrar').addEventListener('click', ()=> box.remove());
+        const b = box.querySelector('.btn-guardar-meses');
+        b.addEventListener('click', ()=>{
+          const meses = Number(box.querySelector('.meses-aud').value);
+          if(!Number.isInteger(meses) || meses < 1 || meses > 24){ avisoBarra('Poné un número entero de meses entre 1 y 24.'); return; }
+          b.disabled = true;
+          guardar(meses).then(res=>{
+            b.disabled = false;
+            if(res.ok){ box.querySelector('.fechas-guardado').classList.add('on'); cargarDatos(); }
+            else if(!planillaCambio(res)) avisoBarra(res.detalle || 'No se pudo guardar.', 4500);
+          }).catch(()=>{ b.disabled = false; avisoBarra('No se pudo guardar. Probá de nuevo.'); });
+        });
+      }
+
+      if(btnMas) btnMas.addEventListener('click', ()=>{
+        formularioMeses(`Sumar a <b>${escapeHtml(emp.empresa)}</b> a la lista de recorridos`, 1,
+          meses => llamarBackend('agregarAuditoria', { empresa: emp.empresa, meses }));
+      });
+      if(btnFrec) btnFrec.addEventListener('click', ()=>{
+        formularioMeses('Cada cuántos meses se hace el recorrido', emp.auditoria.meses || 1,
+          meses => llamarBackend('setFrecuenciaAuditoria', { fila: emp.auditoria.fila,
+                                   nombrePlanilla: emp.auditoria.nombre_planilla, meses }));
+      });
+    })();
 
     // Informe de auditoría: NO se sube nada. El técnico crea el informe
     // directamente en la carpeta AUDITORIAS AMBIENTALES de la empresa; acá lo
@@ -1499,25 +2423,6 @@ function arrancarSync(){
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) chequearVersion(); });
   window.addEventListener('focus', chequearVersion);
 }
-</script>
-<script>
-/* Tamaño de interfaz: 100 -> 115 -> 130 -> 150 -> 100. Se recuerda por app; sin localStorage sigue andando. */
-(function(){
-  var K='gh-escala:seguimiento-ambiental',N=[100,115,130,150],h=document.documentElement,b=document.getElementById('btnEscala');
-  if(!b)return;
-  function leer(){try{var v=parseInt(localStorage.getItem(K),10);return N.indexOf(v)<0?100:v}catch(e){return 100}}
-  function poner(v,avisar){
-    if(v===100)h.removeAttribute('data-escala');else h.setAttribute('data-escala',v);
-    document.getElementById('escalaNivel').textContent=v===100?'':v+'%';var m=document.getElementById('btnEscalaMenos');if(m)m.hidden=(v===100);
-    b.title='Agrandar letra (ahora '+v+'%)';
-    if(avisar)document.getElementById('escalaLive').textContent='Tamaño de la interfaz: '+v+'%';
-  }
-  var v=leer();poner(v,false);
-  b.addEventListener('click',function(){
-    v=N[(N.indexOf(v)+1)%N.length];poner(v,true);
-    try{if(v===100)localStorage.removeItem(K);else localStorage.setItem(K,String(v))}catch(e){}
-  });
-})();
 </script>
 </body>
 </html>
